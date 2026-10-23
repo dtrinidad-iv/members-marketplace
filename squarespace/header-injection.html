@@ -1,0 +1,39 @@
+<!--
+  Squarespace → Settings → Advanced → Code Injection → HEADER
+  (Requires a Core/Business plan or higher for code injection.)
+
+  Files load from a tagged GitHub release via jsDelivr, so every deploy is
+  versioned and rollback = change "@v1.0.0" back to the previous tag.
+-->
+
+<!-- 1. Hide protected pages until auth is checked (prevents a flash of member UI).
+        Must match MP_CONFIG.protectedPaths. mp.js removes the class; 5s failsafe. -->
+<script>
+  (function () {
+    var p = location.pathname.replace(/\/+$/, '');
+    if (['/saved', '/sell', '/account'].some(function (x) { return p === x || p.indexOf(x + '/') === 0; })) {
+      document.documentElement.classList.add('mp-pending');
+      setTimeout(function () { document.documentElement.classList.remove('mp-pending'); }, 5000);
+    }
+  })();
+</script>
+
+<!-- 2. Config. The anon key is public by design; RLS protects the data.
+        NEVER put the service_role key on the site. -->
+<script>
+  window.MP_CONFIG = {
+    supabaseUrl: 'https://YOUR-PROJECT.supabase.co',
+    supabaseAnonKey: 'YOUR-ANON-KEY',
+    paths: {
+      login: '/login', signup: '/join', forgot: '/forgot-password', reset: '/reset-password',
+      marketplace: '/marketplace', saved: '/saved', sell: '/sell', account: '/account'
+    },
+    protectedPaths: ['/saved', '/sell', '/account']
+  };
+</script>
+
+<!-- 3. Styles + scripts (deferred: no render blocking, no impact on SEO/Core Web Vitals) -->
+<link rel="preconnect" href="https://YOUR-PROJECT.supabase.co" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/dtrinidad-iv/members-marketplace@v1.0.0/src/mp.css">
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script defer src="https://cdn.jsdelivr.net/gh/dtrinidad-iv/members-marketplace@v1.0.0/src/mp.js"></script>

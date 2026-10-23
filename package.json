@@ -1,0 +1,15 @@
+{
+  "name": "members-marketplace",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "db:start": "supabase start -x vector,logflare,edge-runtime,imgproxy,supavisor,realtime",
+    "db:stop": "supabase stop",
+    "test": "supabase db reset && node tests/rls.test.mjs",
+    "build:demo": "node scripts/build-demo.mjs"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "2.45.4"
+  }
+}

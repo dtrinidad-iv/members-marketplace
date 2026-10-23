@@ -1,0 +1,444 @@
+<title>Makers Guild Marketplace</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* @inline ../src/mp.css */
+</style>
+<style>
+/* Layout: a mock Squarespace site in a browser frame (left) beside a developer panel (right) that exposes auth + RLS state. */
+:root {
+  --bg: #eef0ec;          /* page ground behind the frame */
+  --site: #fbfbf8;        /* the client's website */
+  --surface: #ffffff;
+  --ink: #18201c;
+  --muted: #5d6862;
+  --line: #d9ddd6;
+  --accent: #1f4d3f;      /* guild green */
+  --accent-ink: #ffffff;
+  --accent-soft: #e3eee8;
+  --panel: #151a17;       /* dev panel stays dark in both themes, like a console */
+  --panel-ink: #dfe6e1;
+  --panel-muted: #8c9a92;
+  --panel-line: #2a322d;
+  --signal: #8fd3b1;
+  --warn: #f2c46d;
+  --bad: #f19a8e;
+  --f-display: "Young Serif", Georgia, "Times New Roman", serif;
+  --f-body: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --mp-accent: var(--accent);
+  --mp-accent-ink: var(--accent-ink);
+  --mp-muted: var(--muted);
+  --mp-surface: var(--surface);
+  --mp-subtle: rgba(31, 77, 63, 0.05);
+  --mp-line: var(--line);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d100e; --site: #141916; --surface: #1b211e; --ink: #e6ece8; --muted: #9aa69f; --line: #2c3530;
+    --accent: #86c9a8; --accent-ink: #0d1a14; --accent-soft: #1f2d26;
+    --panel: #0a0c0b; --panel-ink: #dfe6e1; --panel-muted: #85938b; --panel-line: #232a26;
+    --mp-subtle: rgba(134, 201, 168, 0.06);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d100e; --site: #141916; --surface: #1b211e; --ink: #e6ece8; --muted: #9aa69f; --line: #2c3530;
+  --accent: #86c9a8; --accent-ink: #0d1a14; --accent-soft: #1f2d26;
+  --panel: #0a0c0b; --panel-ink: #dfe6e1; --panel-muted: #85938b; --panel-line: #232a26;
+  --mp-subtle: rgba(134, 201, 168, 0.06);
+  color-scheme: dark;
+}
+
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; }
+button { font: inherit; }
+
+.stage {
+  display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start;
+  max-width: 1440px; margin: 0 auto;
+  padding-block: 20px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.intro { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; }
+.intro h1 { font-family: var(--f-display); font-weight: 400; font-size: 1.6rem; margin: 0; text-wrap: balance; }
+.intro p { margin: 4px 0 0; color: var(--muted); max-width: 70ch; }
+.stack { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { font-family: var(--f-mono); font-size: 11.5px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); background: var(--surface); }
+
+/* Browser frame */
+.browser { min-width: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--site); box-shadow: 0 12px 40px rgba(20, 30, 25, 0.08); }
+.chrome { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.dots { display: flex; gap: 6px; flex: none; }
+.dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+.address { flex: 1; min-width: 0; font-family: var(--f-mono); font-size: 12px; color: var(--muted); background: var(--bg); border-radius: 999px; padding: 6px 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.address b { color: var(--ink); font-weight: 500; }
+.chrome-btn { flex: none; font-size: 12px; border: 1px solid var(--line); background: transparent; color: var(--ink); padding: 5px 10px; border-radius: 999px; cursor: pointer; }
+.chrome-btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+/* The "Squarespace" site */
+.site-header { display: flex; align-items: center; gap: 28px; padding: 18px 32px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.logo { font-family: var(--f-display); font-size: 1.3rem; color: var(--ink); text-decoration: none; display: flex; align-items: center; gap: 8px; }
+.logo svg { width: 22px; height: 22px; color: var(--accent); }
+.site-nav { display: flex; gap: 22px; flex: 1; flex-wrap: wrap; }
+.site-nav a { color: var(--ink); text-decoration: none; font-size: 0.95rem; padding-block: 4px; border-bottom: 1.5px solid transparent; }
+.site-nav a[aria-current="page"] { border-color: var(--accent); }
+main#site-main { padding: 40px 32px 56px; min-height: 520px; }
+.page-head { margin-bottom: 24px; max-width: 62ch; }
+.page-head h2, .hero h2 { font-family: var(--f-display); font-weight: 400; font-size: 2rem; line-height: 1.15; margin: 0 0 8px; text-wrap: balance; }
+.page-head p { margin: 0; color: var(--muted); }
+.hero { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 32px; align-items: center; margin-bottom: 48px; }
+.hero h2 { font-size: 2.6rem; }
+.hero p { color: var(--muted); font-size: 1.05rem; max-width: 48ch; }
+.hero-art { aspect-ratio: 5 / 4; max-width: 100%; border-radius: 14px; background:
+  radial-gradient(60% 50% at 30% 35%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%),
+  radial-gradient(50% 60% at 75% 70%, color-mix(in srgb, #c98b4a 35%, transparent), transparent 70%), var(--accent-soft); display: grid; place-items: center; }
+.hero-art span { font-family: var(--f-display); font-size: 1.1rem; color: var(--accent); border: 1px solid currentColor; padding: 8px 16px; border-radius: 999px; background: var(--site); }
+.section-title { font-family: var(--f-display); font-weight: 400; font-size: 1.35rem; margin: 0 0 14px; }
+.site-footer { padding: 18px 32px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.85rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.mp-dialog { color: var(--ink); font-family: var(--f-body); }
+.mp-detail-title, .mp-auth-title { font-family: var(--f-display); font-weight: 400; }
+.mp-contact { font-family: var(--f-mono); user-select: all; }
+
+/* Code-block outlines: shows the client exactly what gets pasted into Squarespace */
+.show-blocks [data-mp] { outline: 1.5px dashed var(--accent); outline-offset: 6px; position: relative; border-radius: 4px; }
+.show-blocks [data-mp]::before {
+  content: "Code Block · data-mp=\"" attr(data-mp) "\""; position: absolute; top: -18px; left: 0; z-index: 3;
+  font: 500 10.5px/1 var(--f-mono); background: var(--accent); color: var(--accent-ink); padding: 3px 6px; border-radius: 4px; transform: translateY(-50%);
+}
+.show-blocks .site-header [data-mp]::before { top: -6px; }
+
+/* Developer panel */
+.panel { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); background: var(--panel); color: var(--panel-ink); border-radius: 12px; overflow: hidden; font-size: 13px; max-height: calc(100dvh - 32px); display: flex; flex-direction: column; }
+.panel-head { padding: 14px 16px; border-bottom: 1px solid var(--panel-line); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.panel-head strong { font-family: var(--f-mono); font-weight: 500; letter-spacing: 0.02em; }
+.backend { font-family: var(--f-mono); font-size: 11px; color: var(--signal); border: 1px solid currentColor; border-radius: 999px; padding: 2px 8px; }
+.panel-body { overflow: auto; padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 4px; }
+.panel h3 { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--panel-muted); font-weight: 600; margin: 14px 0 8px; }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.pbtn { background: transparent; color: var(--panel-ink); border: 1px solid var(--panel-line); border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 12.5px; text-align: left; }
+.pbtn:hover { border-color: var(--panel-muted); }
+.pbtn small { display: block; font-family: var(--f-mono); font-size: 10.5px; color: var(--panel-muted); }
+.pbtn:focus-visible, .chrome-btn:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.who { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; font-family: var(--f-mono); font-size: 12px; }
+.who dt { color: var(--panel-muted); }
+.who dd { margin: 0; overflow-wrap: anywhere; }
+.pill { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid currentColor; }
+.s-active { color: var(--signal); } .s-pending { color: var(--warn); } .s-suspended, .s-anon { color: var(--bad); }
+.rls { width: 100%; border-collapse: collapse; font-family: var(--f-mono); font-size: 11.5px; }
+.rls td { padding: 6px 4px; border-top: 1px solid var(--panel-line); vertical-align: top; }
+.rls td:nth-child(2) { text-align: right; font-variant-numeric: tabular-nums; color: var(--signal); white-space: nowrap; }
+.rls td:nth-child(3) { color: var(--panel-muted); }
+.rls tr.zero td:nth-child(2) { color: var(--bad); }
+.log { font-family: var(--f-mono); font-size: 11.5px; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; max-height: 190px; overflow: auto; }
+.log li { color: var(--panel-muted); }
+.log li b { color: var(--panel-ink); font-weight: 500; }
+.log time { color: #5f6c65; margin-right: 6px; }
+.hint { color: var(--panel-muted); font-size: 12px; margin: 0; line-height: 1.5; }
+
+.inbox { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 2147483001; width: min(340px, calc(100vw - 32px)); background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.inbox small { font-family: var(--f-mono); color: var(--muted); font-size: 11px; }
+.inbox .row { display: flex; gap: 8px; margin-top: 4px; }
+
+@media (max-width: 1080px) {
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .panel { position: static; max-height: none; }
+}
+@media (max-width: 720px) {
+  .site-header { padding: 14px 18px; gap: 12px 20px; justify-content: space-between; }
+  .site-nav { order: 3; flex-basis: 100%; gap: 18px; }
+  main#site-main { padding: 28px 18px 40px; }
+  .hero { grid-template-columns: 1fr; gap: 20px; }
+  .hero h2 { font-size: 2rem; }
+  .site-footer { padding: 16px 18px; }
+  .address .path-host { display: none; }
+}
+</style>
+
+<div class="stage" id="stage">
+  <header class="intro">
+    <div>
+      <h1>Members marketplace on Supabase + Squarespace</h1>
+      <p>A working prototype. The website is built only from Squarespace Code Blocks. The developer panel shows what Supabase Auth and Row Level Security allow for whoever is signed in.</p>
+    </div>
+    <div class="stack" aria-label="Stack">
+      <span class="tag">Supabase Auth</span><span class="tag">Postgres RLS</span><span class="tag">Storage</span><span class="tag">Vanilla ES2020</span><span class="tag">Squarespace 7.1</span>
+    </div>
+  </header>
+
+  <div class="browser">
+    <div class="chrome">
+      <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      <div class="address" id="address" aria-label="Current page address"></div>
+      <button class="chrome-btn" id="toggle-blocks" type="button" aria-pressed="false">Show code blocks</button>
+    </div>
+
+    <header class="site-header">
+      <a class="logo" href="/" data-nav>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 20V9l8-5 8 5v11"/><path d="M9 20v-6h6v6"/></svg>
+        Makers Guild
+      </a>
+      <nav class="site-nav" aria-label="Site">
+        <a href="/" data-nav>Home</a>
+        <a href="/marketplace" data-nav>Marketplace</a>
+        <a href="/sell" data-nav>Sell</a>
+      </nav>
+      <div data-mp="auth-nav"></div>
+    </header>
+
+    <main id="site-main"></main>
+
+    <footer class="site-footer">
+      <span>© 2026 Makers Guild · fictional site for this prototype</span>
+      <span>Member pages are set to noindex</span>
+    </footer>
+  </div>
+
+  <aside class="panel" aria-label="Developer panel">
+    <div class="panel-head"><strong>dev panel</strong><span class="backend" id="backend">mock backend</span></div>
+    <div class="panel-body">
+      <h3>Try it as</h3>
+      <div class="btns">
+        <button class="pbtn" type="button" data-as="member@demo.com">Active member<small>member@demo.com</small></button>
+        <button class="pbtn" type="button" data-as="pending@demo.com">Pending member<small>pending@demo.com</small></button>
+        <button class="pbtn" type="button" id="as-visitor">Visitor<small>signed out</small></button>
+      </div>
+      <p class="hint">Password for demo accounts: <code>demo1234</code>. You can also sign up with any email. New accounts start as pending.</p>
+
+      <h3>Session</h3>
+      <dl class="who" id="who"></dl>
+
+      <h3>Admin (service role only)</h3>
+      <div class="btns">
+        <button class="pbtn" type="button" data-status="active">Approve</button>
+        <button class="pbtn" type="button" data-status="pending">Set pending</button>
+        <button class="pbtn" type="button" data-status="suspended">Suspend</button>
+      </div>
+      <p class="hint">These change <code>profiles.membership_status</code>. The browser has no permission to do this in production.</p>
+
+      <h3>What RLS returns right now</h3>
+      <table class="rls"><tbody id="rls"></tbody></table>
+
+      <h3>Event log</h3>
+      <ol class="log" id="log"></ol>
+
+      <h3>Demo data</h3>
+      <div class="btns"><button class="pbtn" type="button" id="reset-data">Reset demo data</button></div>
+    </div>
+  </aside>
+</div>
+
+<!-- Pages. Each one is what you'd build in Squarespace: normal content plus Code Blocks. -->
+<template data-page="/">
+  <section class="hero">
+    <div>
+      <h2>A members’ marketplace for independent makers</h2>
+      <p>Furniture, ceramics, prints and services, bought and sold inside the guild. Members see prices, photos and seller contacts.</p>
+      <div class="mp-actions" style="margin-top:18px"><a class="mp-btn" href="/marketplace" data-nav>Browse the marketplace</a><a class="mp-btn mp-btn-ghost" href="/join" data-nav>Become a member</a></div>
+    </div>
+    <div class="hero-art" aria-hidden="true"><span>Made by members</span></div>
+  </section>
+  <h3 class="section-title">Fresh from members</h3>
+  <div data-mp="marketplace" data-limit="4"></div>
+</template>
+
+<template data-page="/marketplace">
+  <div class="page-head"><h2>Marketplace</h2><p>Search, filter and save listings from fellow members.</p></div>
+  <div data-mp="marketplace"></div>
+</template>
+
+<template data-page="/login">
+  <div data-mp="login"></div>
+</template>
+<template data-page="/join">
+  <div data-mp="signup"></div>
+</template>
+<template data-page="/forgot-password">
+  <div data-mp="forgot"></div>
+</template>
+<template data-page="/reset-password">
+  <div data-mp="reset"></div>
+</template>
+
+<template data-page="/saved">
+  <div class="page-head"><h2>Saved listings</h2><p>Everything you’ve bookmarked, in one place.</p></div>
+  <div data-mp="saved"></div>
+</template>
+<template data-page="/sell">
+  <div class="page-head"><h2>Sell with the guild</h2><p>Photos are stored in a private bucket and shown to members through short-lived signed links.</p></div>
+  <div data-mp="sell"></div>
+</template>
+<template data-page="/account">
+  <div data-mp="account"></div>
+</template>
+
+<script>
+/* @inline ../src/mp-mock.js */
+</script>
+<script>
+(function () {
+  'use strict';
+  const $ = (s) => document.querySelector(s);
+  const main = $('#site-main');
+  const route = { path: '/', query: new URLSearchParams() };
+  const HOST = 'members.makersguild.com';
+
+  function log(text, strong) {
+    const li = document.createElement('li');
+    const t = document.createElement('time');
+    t.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const b = document.createElement('b');
+    b.textContent = strong || '';
+    li.append(t, b, strong ? ' ' : '', text);
+    const ol = $('#log');
+    ol.prepend(li);
+    while (ol.children.length > 40) ol.lastChild.remove();
+  }
+
+  function renderAddress() {
+    const q = route.query.toString();
+    const a = $('#address');
+    a.replaceChildren();
+    const host = document.createElement('span');
+    host.className = 'path-host';
+    host.textContent = `https://${HOST}`;
+    const p = document.createElement('b');
+    p.textContent = route.path;
+    a.append(host, p, q ? `?${decodeURIComponent(q)}` : '');
+  }
+
+  function render() {
+    const tpl = document.querySelector(`template[data-page="${route.path}"]`) || document.querySelector('template[data-page="/"]');
+    if (window.MP && MP.config.protectedPaths.includes(route.path)) document.documentElement.classList.add('mp-pending');
+    main.replaceChildren(tpl.content.cloneNode(true));
+    document.querySelectorAll('.site-nav a').forEach((a) => {
+      if (a.getAttribute('href') === route.path) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    renderAddress();
+    if (window.MP) MP.mount(main);
+  }
+
+  function navigate(url) {
+    const u = new URL(url, `https://${HOST}`);
+    const from = route.path;
+    route.path = u.pathname.replace(/\/+$/, '') || '/';
+    route.query = u.searchParams;
+    if (from !== route.path || u.search) log(`${route.path}${u.search}`, 'nav');
+    document.querySelectorAll('dialog[open]').forEach((d) => d.close());
+    render();
+    document.getElementById('stage').scrollIntoView({ block: 'start' });
+  }
+
+  // Intercept site links so the whole demo runs in one page.
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a[data-nav]');
+    if (!a) return;
+    e.preventDefault();
+    navigate(a.getAttribute('href'));
+  });
+
+  function showEmail({ to, token }) {
+    log(`password reset email → ${to}`, 'mail');
+    document.querySelectorAll('.inbox').forEach((n) => n.remove());
+    const box = document.createElement('div');
+    box.className = 'inbox';
+    box.setAttribute('role', 'status');
+    box.innerHTML = '<small>Simulated inbox</small><strong>Reset your Makers Guild password</strong><span>Someone asked to reset the password for this account. The link expires in 1 hour.</span><div class="row"><button class="mp-btn mp-btn-sm" type="button" data-open>Open reset link</button><button class="mp-btn mp-btn-sm mp-btn-ghost" type="button" data-dismiss>Dismiss</button></div>';
+    box.querySelector('small').textContent = `Simulated inbox · to ${to}`;
+    box.querySelector('[data-open]').onclick = () => {
+      box.remove();
+      navigate('/reset-password');
+      setTimeout(() => mock.debug.useRecovery(token), 300);
+    };
+    box.querySelector('[data-dismiss]').onclick = () => box.remove();
+    document.body.append(box);
+  }
+
+  const mock = window.MPMock.create({ onEmail: showEmail, onLog: (t) => log(t.replace(/^\w+: /, ''), t.split(':')[0]) });
+  window.__mock = mock;
+
+  window.MP_CONFIG = {
+    backend: mock,
+    pageSize: 8,
+    router: {
+      path: () => route.path,
+      query: () => new URLSearchParams(route.query),
+      go: (url) => {
+        if (/\?next=/.test(url) && url.startsWith('/login')) log(`protected page → ${url}`, 'guard');
+        navigate(url);
+      },
+      setQuery(params) {
+        Object.entries(params).forEach(([k, v]) => (v ? route.query.set(k, v) : route.query.delete(k)));
+        renderAddress();
+      },
+    },
+  };
+
+  // Dev panel
+  function renderPanel() {
+    const cur = mock.debug.current();
+    const who = $('#who');
+    who.replaceChildren();
+    const row = (k, v) => {
+      const dt = document.createElement('dt'); dt.textContent = k;
+      const dd = document.createElement('dd');
+      dd.append(v);
+      who.append(dt, dd);
+    };
+    if (!cur.session) {
+      const s = document.createElement('span'); s.className = 'pill s-anon'; s.textContent = 'anon';
+      row('role', s);
+      row('jwt', 'none (anon key only)');
+    } else {
+      const s = document.createElement('span');
+      s.className = `pill s-${cur.user.membership_status}`;
+      s.textContent = cur.user.membership_status;
+      row('email', cur.user.email);
+      row('sub', cur.session.user.id);
+      row('role', 'authenticated');
+      row('member', s);
+      row('expires', new Date(cur.session.expires_at * 1000).toLocaleTimeString());
+    }
+    const rep = mock.debug.rlsReport();
+    const tb = $('#rls');
+    tb.replaceChildren();
+    rep.rows.forEach(([q, n, note]) => {
+      const tr = document.createElement('tr');
+      if (n === 0 || n === '✕') tr.className = 'zero';
+      [q, n, note].forEach((c) => { const td = document.createElement('td'); td.textContent = c; tr.append(td); });
+      tb.append(tr);
+    });
+  }
+
+  document.addEventListener('mp:auth', renderPanel);
+  setInterval(renderPanel, 1000); // keep RLS counts current as you save/post
+  document.querySelectorAll('[data-as]').forEach((b) => b.addEventListener('click', async () => {
+    if (mock.debug.current().session) await MP.api.auth.signOut();
+    await mock.debug.loginAs(b.dataset.as);
+    navigate('/marketplace');
+  }));
+  $('#as-visitor').addEventListener('click', async () => {
+    if (mock.debug.current().session) await MP.api.auth.signOut();
+    navigate('/marketplace');
+  });
+  document.querySelectorAll('[data-status]').forEach((b) => b.addEventListener('click', () => {
+    if (!mock.debug.current().session) { MP.toast('Sign in first, then change that account’s status.'); return; }
+    mock.debug.setStatus(b.dataset.status);
+  }));
+  $('#reset-data').addEventListener('click', () => { mock.debug.reset(); location.reload(); });
+  $('#toggle-blocks').addEventListener('click', (e) => {
+    const on = document.body.classList.toggle('show-blocks');
+    e.currentTarget.setAttribute('aria-pressed', String(on));
+  });
+
+  render();
+  renderPanel();
+  log('page loaded with mock backend', 'init');
+})();
+</script>
+<script>
+/* @inline ../src/mp.js */
+</script>
