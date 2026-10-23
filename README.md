@@ -1,6 +1,8 @@
 # Members Marketplace — Supabase + Squarespace
 
-A secure, members-only marketplace that runs inside an existing Squarespace site. Squarespace stays the CMS and the design; Supabase handles accounts, data, files and access rules.
+A secure, members-only marketplace designed to run inside an existing Squarespace site. Squarespace stays the CMS and the design; Supabase handles accounts, data, files and access rules.
+
+> **Prototype status:** the demo runs in a mock-up of a Squarespace site with an in-browser stand-in for Supabase. The database rules have been tested against a real (local) Supabase instance. The Squarespace snippets are ready to install but haven't been tested on a live Squarespace site yet.
 
 ```
 Squarespace page ──► Code Block <div data-mp="marketplace">
@@ -15,7 +17,7 @@ Squarespace page ──► Code Block <div data-mp="marketplace">
 
 **Live demo:** https://dtrinidad-iv.github.io/members-marketplace/. It runs in the browser with nothing to install. A built-in mock backend applies the same access rules as the real database.
 
-The page shows a sample Squarespace site, with a **developer panel** beside it showing who is signed in and what the database returns for them.
+The page shows a mock-up of a Squarespace site (a fictional "Makers Guild"), with a **developer panel** beside it showing who is signed in and what the database returns for them.
 
 | Account | Password | What you'll see |
 |---|---|---|
