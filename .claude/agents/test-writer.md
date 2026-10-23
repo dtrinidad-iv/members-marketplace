@@ -13,7 +13,7 @@ You add tests to this repo. Match the existing style of the file you extend.
 - Add seed rows to `supabase/seed.sql` if a test needs data. Never edit a committed migration.
 - Run with `npm run test:rls` (it resets the local DB first).
 
-**UI changes** → `tests/demo.e2e.test.mjs` (headless Chrome against `dist/marketplace-demo.html`, which uses the mock backend in `src/mp-mock.js`).
+**UI changes** → `tests/demo.e2e.test.mjs` (headless Chrome against `docs/index.html`, or a live URL via `DEMO_URL`, which uses the mock backend in `src/mp-mock.js`).
 - If you add a backend method in `src/mp.js`, add the same method with the same access rules to `src/mp-mock.js`.
 - Assert on what a user sees (text, URL in the address bar, counts), not on implementation details.
 - Run with `npm run test:e2e`.

@@ -10,7 +10,7 @@ Members-only marketplace embedded in a client's existing Squarespace site. Squar
 - `src/mp-mock.js` is a demo-only backend. It must mirror both the interface of the Supabase backend in `mp.js` and the RLS rules.
 - `src/mp.css` holds styles. Every selector is scoped to `.mp*`.
 - `squarespace/` contains the snippets the client pastes into Squarespace.
-- `demo/shell.html` → `dist/marketplace-demo.html` is the clickable demo (`npm run build:demo`).
+- `demo/shell.html` → `docs/index.html` is the clickable demo, served by GitHub Pages at https://dtrinidad-iv.github.io/members-marketplace/ (`npm run build:demo`, then commit `docs/`).
 - `tests/` has the hook tests, the end-to-end demo tests and the RLS tests.
 
 ## Commands

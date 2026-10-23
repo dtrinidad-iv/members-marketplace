@@ -24,6 +24,7 @@ const page = `<!doctype html>
 <meta name="description" content="${description}">
 <meta property="og:title" content="Members Marketplace on Supabase + Squarespace">
 <meta property="og:description" content="${description}">
+<link rel="icon" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#1f4d3f"/><path d="M6 18V10l6-4 6 4v8M10 18v-4h4v4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>')}">
 <style>
 :root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 body { margin: 0; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
