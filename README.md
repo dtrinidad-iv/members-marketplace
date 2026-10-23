@@ -18,7 +18,8 @@ Squarespace page ──► Code Block <div data-mp="marketplace">
 | `supabase/migrations/…_marketplace.sql` | Tables, Row Level Security, triggers, storage bucket + policies |
 | `supabase/seed.sql` | Local demo accounts and listings (password `demo1234`) |
 | `supabase/admin.sql` | Approve/suspend members, verify RLS as `anon` |
-| `tests/rls.test.mjs` | 23 access-control tests run against a real local Supabase |
+| `tests/` | RLS tests (real local Supabase), demo end-to-end tests (headless Chrome), hook tests |
+| `CLAUDE.md`, `.claude/` | Claude Code setup: project rules, hooks, subagents, workflows |
 | `src/mp.js` | The whole front end: auth store, route guard, components |
 | `src/mp.css` | Styles, all scoped to `.mp-*` and themable through CSS variables |
 | `src/mp-mock.js` | Demo-only in-browser backend with the same rules (no setup needed) |
@@ -68,15 +69,36 @@ Needs the Supabase CLI and a Docker runtime (Colima or Docker Desktop).
 colima start                 # Docker runtime
 npm install
 npm run db:start             # Postgres, Auth, Storage, Studio; applies migrations + seed
-npm test                     # resets the DB, then runs the 23 RLS/Storage tests
+npm test                     # all 43 tests (below)
 ```
 
+| Command | Tests | What it covers |
+|---|---|---|
+| `npm run test:rls` | 23 | Logs in as visitor, pending, member and seller against the real API: reads, writes, privilege escalation, storage uploads and signed URLs |
+| `npm run test:e2e` | 10 | Drives the demo in headless Chrome: gating, redirects, filters, deep links, saving, approval, posting, password reset, mobile layout |
+| `npm run test:hooks` | 10 | The Claude Code hooks block and allow what they should |
+
 Studio: http://127.0.0.1:54323 · Emails (reset links): http://127.0.0.1:54324
+
+## Working with Claude Code
+
+This repo is set up for [Claude Code](https://claude.com/claude-code). The guardrails live in the repo, so every session follows the same rules.
+
+- **`CLAUDE.md`**: architecture and the project's rules (anon key only, RLS for anything members-only, append-only migrations, no `innerHTML`, scoped CSS).
+- **Hooks** (`.claude/hooks/`, configured in `.claude/settings.json`):
+  | Hook | When | What it does |
+  |---|---|---|
+  | `guard-bash` | before shell commands | Blocks force pushes, deleting migrations or release tags, and resetting/deleting the production database. Asks a human before `supabase db push`, `git push` and GitHub changes. |
+  | `guard-files` | before file writes | Blocks `service_role` keys and `sb_secret_` values from entering the repo. Blocks edits to committed migrations. |
+  | `check-frontend` | after edits to `src/` | Syntax-checks JS and flags `innerHTML` (XSS) and CSS selectors that would leak into the Squarespace theme; Claude has to fix them. Rebuilds the demo. |
+  | `session-status` | session start | Tells Claude whether local Supabase is running. |
+- **Subagents** (`.claude/agents/`): `rls-reviewer` audits migrations for access-control holes, `frontend-reviewer` checks Squarespace compatibility, XSS and auth flows, and `test-writer` adds role-by-role RLS and e2e tests.
+- **Workflows** (`.claude/skills/`): `/new-migration <change>` writes the migration, applies it, adds tests and gets it reviewed. `/release <version>` runs every check, bumps versions and tags (user-triggered only; never pushes by itself).
 
 ## Go live
 
 1. Create a Supabase project, then `supabase link --project-ref <ref>` and `supabase db push` (or paste the migration into the SQL editor). Don't push `seed.sql`.
-2. Push this repo to GitHub, then `git tag v1.0.0 && git push --tags`.
-3. Paste `squarespace/header-injection.html` into Code Injection → Header (fill in the URL, anon key and GitHub user).
+2. Releases are tagged (`v1.0.0`) and served by jsDelivr. Use `/release` for new versions.
+3. Paste `squarespace/header-injection.html` into Code Injection → Header (fill in the Supabase URL and anon key).
 4. Create the pages and Code Blocks listed in `squarespace/code-blocks.md`.
 5. Approve members with `supabase/admin.sql` (or later, a Stripe webhook / admin page).
