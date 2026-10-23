@@ -1,0 +1,1778 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Working prototype of a members-only marketplace on Supabase (Auth, Row Level Security, Storage) embedded in a Squarespace site with vanilla JS Code Blocks.">
+<meta property="og:title" content="Members Marketplace on Supabase + Squarespace">
+<meta property="og:description" content="Working prototype of a members-only marketplace on Supabase (Auth, Row Level Security, Storage) embedded in a Squarespace site with vanilla JS Code Blocks.">
+<style>
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<title>Makers Guild Marketplace</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Members Marketplace — every rule is scoped to .mp* classes so nothing leaks
+   into the Squarespace theme. Fonts inherit from the site; colors come from
+   the variables below (override them in Design → Custom CSS). */
+:root {
+  --mp-accent: #1f4d3f;
+  --mp-accent-ink: #ffffff;
+  --mp-ink: inherit;
+  --mp-muted: rgba(0, 0, 0, 0.58);
+  --mp-surface: #ffffff;
+  --mp-subtle: rgba(0, 0, 0, 0.04);
+  --mp-line: rgba(0, 0, 0, 0.12);
+  --mp-danger: #b42318;
+  --mp-ok: #067647;
+  --mp-radius: 10px;
+  --mp-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+/* Anti-flicker for protected pages (class set by the header snippet). */
+html.mp-pending main, html.mp-pending #page { visibility: hidden; }
+
+.mp, .mp * , .mp *::before, .mp *::after { box-sizing: border-box; }
+.mp { font: inherit; color: var(--mp-ink); line-height: 1.5; }
+.mp p { margin: 0 0 0.5em; }
+.mp-icon { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.125em; flex: none; }
+.mp-muted { color: var(--mp-muted); font-size: 0.875em; display: inline-flex; align-items: center; gap: 0.25em; }
+.mp-error { color: var(--mp-danger); font-size: 0.9em; }
+.mp-empty { color: var(--mp-muted); padding: 2rem 0; grid-column: 1 / -1; text-align: center; }
+
+/* Buttons & inputs */
+.mp-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.4em;
+  padding: 0.65em 1.15em; border: 1px solid var(--mp-accent); border-radius: 999px;
+  background: var(--mp-accent); color: var(--mp-accent-ink) !important; font: inherit; font-size: 0.95em;
+  text-decoration: none !important; cursor: pointer; transition: opacity 0.15s, transform 0.15s; white-space: nowrap;
+}
+.mp-btn:hover { opacity: 0.9; }
+.mp-btn:active { transform: translateY(1px); }
+.mp-btn:disabled { opacity: 0.6; cursor: progress; }
+.mp-btn-ghost { background: transparent; color: var(--mp-accent) !important; }
+.mp-btn-sm { padding: 0.4em 0.9em; font-size: 0.85em; }
+.mp-btn-block { width: 100%; }
+.mp-link { background: none; border: 0; padding: 0; font: inherit; color: var(--mp-accent); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.mp-input {
+  width: 100%; font: inherit; font-size: 0.95em; color: inherit; background: var(--mp-surface);
+  border: 1px solid var(--mp-line); border-radius: var(--mp-radius); padding: 0.6em 0.8em; min-height: 2.6em;
+}
+.mp-input:focus { outline: 2px solid var(--mp-accent); outline-offset: 1px; border-color: transparent; }
+.mp-btn:focus-visible, .mp-link:focus-visible, .mp-card-hit:focus-visible, .mp-save:focus-visible { outline: 2px solid var(--mp-accent); outline-offset: 2px; }
+.mp-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+
+/* Filters */
+.mp-filters { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 7.5rem minmax(0, 1fr); gap: 0.6rem; margin-bottom: 0.75rem; }
+.mp-search { position: relative; display: block; }
+.mp-search .mp-icon { position: absolute; left: 0.8em; top: 50%; transform: translateY(-50%); color: var(--mp-muted); }
+.mp-search .mp-input { padding-left: 2.3em; }
+.mp-count { margin: 0 0 0.75rem; }
+.mp-more { display: flex; margin: 1.5rem auto 0; }
+@media (max-width: 720px) {
+  .mp-filters { grid-template-columns: 1fr 1fr; }
+  .mp-search, .mp-filters > select[aria-label="Sort"] { grid-column: 1 / -1; }
+}
+
+/* Grid & cards */
+.mp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 1.1rem; }
+.mp-card {
+  position: relative; display: flex; flex-direction: column; background: var(--mp-surface);
+  border: 1px solid var(--mp-line); border-radius: calc(var(--mp-radius) + 4px); overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.mp-card:hover { box-shadow: var(--mp-shadow); transform: translateY(-2px); }
+.mp-card-hit { position: absolute; inset: 0; z-index: 1; background: none; border: 0; cursor: pointer; border-radius: inherit; }
+.mp-card-media { position: relative; aspect-ratio: 4 / 3; background: var(--mp-subtle); overflow: hidden; }
+.mp-card-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mp-card-body { padding: 0.8rem 0.9rem 0.9rem; display: flex; flex-direction: column; gap: 0.35rem; flex: 1; }
+.mp-card-meta { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.mp-card-title { font-size: 1rem !important; line-height: 1.3 !important; margin: 0 !important; font-weight: 600; letter-spacing: 0 !important; }
+.mp-card-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-top: auto; padding-top: 0.25rem; }
+.mp-chip { font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.06em; padding: 0.2em 0.6em; border-radius: 999px; background: var(--mp-subtle); border: 1px solid var(--mp-line); }
+.mp-price { font-variant-numeric: tabular-nums; }
+.mp-price-lg { font-size: 1.35em; font-weight: 600; }
+.mp-blur { filter: blur(5px); user-select: none; }
+.mp-card-locked .mp-card-title { opacity: 0.9; }
+
+.mp-ph {
+  width: 100%; height: 100%; display: grid; place-items: center; font-size: 2.2rem; font-weight: 600;
+  color: hsl(var(--mp-hue, 150) 35% 30% / 0.75);
+  background:
+    radial-gradient(120% 90% at 20% 10%, hsl(var(--mp-hue, 150) 45% 88%), transparent 60%),
+    linear-gradient(135deg, hsl(var(--mp-hue, 150) 35% 80%), hsl(calc(var(--mp-hue, 150) + 40) 30% 70%));
+}
+.mp-ph .mp-icon { width: 1.6rem; height: 1.6rem; }
+
+.mp-save {
+  position: absolute; top: 0.6rem; right: 0.6rem; z-index: 2; display: inline-flex; align-items: center; gap: 0.35em;
+  border: 0; border-radius: 999px; padding: 0.45em; background: rgba(255, 255, 255, 0.92); color: #333; cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18); transition: transform 0.15s;
+}
+.mp-save:hover { transform: scale(1.08); }
+.mp-save.mp-on { color: #d92d20; }
+.mp-save.mp-on .mp-icon { fill: currentColor; }
+.mp-actions .mp-save { position: static; padding: 0.6em 1em; background: var(--mp-subtle); color: inherit; box-shadow: none; border: 1px solid var(--mp-line); }
+.mp-actions .mp-save.mp-on { color: #d92d20; }
+
+/* Gate prompt */
+.mp-gate {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 1rem 1.15rem; margin: 0 0 1rem;
+  border: 1px dashed var(--mp-line); border-radius: calc(var(--mp-radius) + 4px); background: var(--mp-subtle);
+}
+.mp-gate > div:nth-child(2) { flex: 1 1 260px; }
+.mp-gate strong { display: block; margin-bottom: 0.15rem; }
+.mp-gate p { margin: 0; color: var(--mp-muted); font-size: 0.92em; }
+.mp-gate-icon { width: 2.5rem; height: 2.5rem; border-radius: 50%; display: grid; place-items: center; background: var(--mp-accent); color: var(--mp-accent-ink); flex: none; }
+.mp-grid + .mp-gate-slot .mp-gate { margin-top: 1rem; }
+.mp-dialog .mp-gate { border: 0; background: none; margin: 0; padding: 1.75rem 1.5rem 1.5rem; }
+
+/* Dialog */
+.mp-dialog {
+  width: min(760px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); padding: 0; border: 0;
+  border-radius: 16px; background: var(--mp-surface); color: inherit; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3); overflow: auto;
+}
+.mp-dialog::backdrop { background: rgba(10, 15, 13, 0.55); backdrop-filter: blur(2px); }
+.mp-dialog-x { position: absolute; top: 0.75rem; right: 0.75rem; z-index: 3; width: 2.25rem; height: 2.25rem; border-radius: 50%; border: 0; background: rgba(255, 255, 255, 0.92); color: #222; cursor: pointer; display: grid; place-items: center; }
+.mp-detail { display: grid; grid-template-columns: 1fr 1fr; min-height: 320px; }
+.mp-detail-media { background: var(--mp-subtle); min-height: 260px; }
+.mp-detail-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mp-detail-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.mp-detail-title { font-size: 1.5rem !important; line-height: 1.25 !important; margin: 0.25rem 0 0 !important; }
+.mp-detail-desc { white-space: pre-line; }
+@media (max-width: 640px) { .mp-detail { grid-template-columns: 1fr; } .mp-detail-media { aspect-ratio: 4 / 3; min-height: 0; } }
+
+/* Auth forms & account */
+.mp-auth { max-width: 420px; margin: 0 auto; display: flex; flex-direction: column; gap: 0.85rem; }
+.mp-auth-title { font-size: 1.5rem !important; margin: 0 !important; line-height: 1.25 !important; }
+.mp-field { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.9em; }
+.mp-field > span { font-weight: 500; }
+.mp-auth-foot { font-size: 0.9em; text-align: center; color: var(--mp-muted); }
+.mp-sell { max-width: 560px; }
+.mp-upload { display: flex; align-items: center; gap: 0.9rem; }
+.mp-upload-preview { width: 84px; height: 64px; border-radius: 8px; overflow: hidden; flex: none; border: 1px solid var(--mp-line); }
+.mp-upload-preview img { width: 100%; height: 100%; object-fit: cover; }
+.mp-upload-preview .mp-ph { font-size: 1.3rem; }
+.mp-account { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem; }
+.mp-account .mp-auth { margin: 0; max-width: none; padding: 1.15rem; border: 1px solid var(--mp-line); border-radius: calc(var(--mp-radius) + 4px); }
+.mp-account .mp-auth .mp-auth-title { font-size: 1.05rem !important; }
+.mp-account-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.mp-badge { font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.06em; padding: 0.3em 0.75em; border-radius: 999px; font-weight: 600; }
+.mp-badge-active { background: #dcfae6; color: var(--mp-ok); }
+.mp-badge-pending { background: #fef0c7; color: #93370d; }
+.mp-badge-suspended { background: #fee4e2; color: var(--mp-danger); }
+
+/* Nav */
+.mp-nav { display: flex; align-items: center; gap: 1rem; font-size: 0.95em; }
+.mp-nav .mp-link { text-decoration: none; color: inherit; }
+.mp-nav .mp-link:hover { text-decoration: underline; }
+
+/* Toasts */
+.mp-toasts { position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%); z-index: 2147483000; display: flex; flex-direction: column; gap: 0.5rem; align-items: center; pointer-events: none; }
+.mp-toast { background: #1b1f1d; color: #fff; padding: 0.6rem 1rem; border-radius: 999px; font-size: 0.9rem; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25); transition: opacity 0.3s, transform 0.3s; }
+.mp-toast-error { background: var(--mp-danger); }
+.mp-toast-ok { background: var(--mp-ok); }
+.mp-toast.mp-out { opacity: 0; transform: translateY(6px); }
+
+/* Skeletons */
+.mp-skeleton { background: linear-gradient(90deg, var(--mp-subtle) 25%, rgba(127, 127, 127, 0.12) 50%, var(--mp-subtle) 75%); background-size: 200% 100%; animation: mp-shimmer 1.2s infinite linear; border-radius: 6px; }
+.mp-skeleton-card { padding-bottom: 0.9rem; gap: 0.5rem; }
+.mp-skeleton-media { aspect-ratio: 4 / 3; border-radius: 0; }
+.mp-skeleton-line { height: 0.9rem; margin: 0 0.9rem; }
+.mp-skeleton-line.mp-short { width: 45%; }
+.mp-skeleton-hero { grid-column: 1 / -1; height: 320px; border-radius: 0; }
+@keyframes mp-shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .mp-skeleton { animation: none; } .mp-card, .mp-card:hover { transition: none; transform: none; } }
+
+</style>
+<style>
+/* Layout: a mock Squarespace site in a browser frame (left) beside a developer panel (right) that exposes auth + RLS state. */
+:root {
+  --bg: #eef0ec;          /* page ground behind the frame */
+  --site: #fbfbf8;        /* the client's website */
+  --surface: #ffffff;
+  --ink: #18201c;
+  --muted: #5d6862;
+  --line: #d9ddd6;
+  --accent: #1f4d3f;      /* guild green */
+  --accent-ink: #ffffff;
+  --accent-soft: #e3eee8;
+  --panel: #151a17;       /* dev panel stays dark in both themes, like a console */
+  --panel-ink: #dfe6e1;
+  --panel-muted: #8c9a92;
+  --panel-line: #2a322d;
+  --signal: #8fd3b1;
+  --warn: #f2c46d;
+  --bad: #f19a8e;
+  --f-display: "Young Serif", Georgia, "Times New Roman", serif;
+  --f-body: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --mp-accent: var(--accent);
+  --mp-accent-ink: var(--accent-ink);
+  --mp-muted: var(--muted);
+  --mp-surface: var(--surface);
+  --mp-subtle: rgba(31, 77, 63, 0.05);
+  --mp-line: var(--line);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d100e; --site: #141916; --surface: #1b211e; --ink: #e6ece8; --muted: #9aa69f; --line: #2c3530;
+    --accent: #86c9a8; --accent-ink: #0d1a14; --accent-soft: #1f2d26;
+    --panel: #0a0c0b; --panel-ink: #dfe6e1; --panel-muted: #85938b; --panel-line: #232a26;
+    --mp-subtle: rgba(134, 201, 168, 0.06);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d100e; --site: #141916; --surface: #1b211e; --ink: #e6ece8; --muted: #9aa69f; --line: #2c3530;
+  --accent: #86c9a8; --accent-ink: #0d1a14; --accent-soft: #1f2d26;
+  --panel: #0a0c0b; --panel-ink: #dfe6e1; --panel-muted: #85938b; --panel-line: #232a26;
+  --mp-subtle: rgba(134, 201, 168, 0.06);
+  color-scheme: dark;
+}
+
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; }
+button { font: inherit; }
+
+.stage {
+  display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start;
+  max-width: 1440px; margin: 0 auto;
+  padding-block: 20px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.intro { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; }
+.intro h1 { font-family: var(--f-display); font-weight: 400; font-size: 1.6rem; margin: 0; text-wrap: balance; }
+.intro p { margin: 4px 0 0; color: var(--muted); max-width: 70ch; }
+.stack { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { font-family: var(--f-mono); font-size: 11.5px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); background: var(--surface); }
+
+/* Browser frame */
+.browser { min-width: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--site); box-shadow: 0 12px 40px rgba(20, 30, 25, 0.08); }
+.chrome { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.dots { display: flex; gap: 6px; flex: none; }
+.dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+.address { flex: 1; min-width: 0; font-family: var(--f-mono); font-size: 12px; color: var(--muted); background: var(--bg); border-radius: 999px; padding: 6px 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.address b { color: var(--ink); font-weight: 500; }
+.chrome-btn { flex: none; font-size: 12px; border: 1px solid var(--line); background: transparent; color: var(--ink); padding: 5px 10px; border-radius: 999px; cursor: pointer; }
+.chrome-btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+/* The "Squarespace" site */
+.site-header { display: flex; align-items: center; gap: 28px; padding: 18px 32px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.logo { font-family: var(--f-display); font-size: 1.3rem; color: var(--ink); text-decoration: none; display: flex; align-items: center; gap: 8px; }
+.logo svg { width: 22px; height: 22px; color: var(--accent); }
+.site-nav { display: flex; gap: 22px; flex: 1; flex-wrap: wrap; }
+.site-nav a { color: var(--ink); text-decoration: none; font-size: 0.95rem; padding-block: 4px; border-bottom: 1.5px solid transparent; }
+.site-nav a[aria-current="page"] { border-color: var(--accent); }
+main#site-main { padding: 40px 32px 56px; min-height: 520px; }
+.page-head { margin-bottom: 24px; max-width: 62ch; }
+.page-head h2, .hero h2 { font-family: var(--f-display); font-weight: 400; font-size: 2rem; line-height: 1.15; margin: 0 0 8px; text-wrap: balance; }
+.page-head p { margin: 0; color: var(--muted); }
+.hero { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 32px; align-items: center; margin-bottom: 48px; }
+.hero h2 { font-size: 2.6rem; }
+.hero p { color: var(--muted); font-size: 1.05rem; max-width: 48ch; }
+.hero-art { aspect-ratio: 5 / 4; max-width: 100%; border-radius: 14px; background:
+  radial-gradient(60% 50% at 30% 35%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%),
+  radial-gradient(50% 60% at 75% 70%, color-mix(in srgb, #c98b4a 35%, transparent), transparent 70%), var(--accent-soft); display: grid; place-items: center; }
+.hero-art span { font-family: var(--f-display); font-size: 1.1rem; color: var(--accent); border: 1px solid currentColor; padding: 8px 16px; border-radius: 999px; background: var(--site); }
+.section-title { font-family: var(--f-display); font-weight: 400; font-size: 1.35rem; margin: 0 0 14px; }
+.site-footer { padding: 18px 32px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.85rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.mp-dialog { color: var(--ink); font-family: var(--f-body); }
+.mp-detail-title, .mp-auth-title { font-family: var(--f-display); font-weight: 400; }
+.mp-contact { font-family: var(--f-mono); user-select: all; }
+
+/* Code-block outlines: shows the client exactly what gets pasted into Squarespace */
+.show-blocks [data-mp] { outline: 1.5px dashed var(--accent); outline-offset: 6px; position: relative; border-radius: 4px; }
+.show-blocks [data-mp]::before {
+  content: "Code Block · data-mp=\"" attr(data-mp) "\""; position: absolute; top: -18px; left: 0; z-index: 3;
+  font: 500 10.5px/1 var(--f-mono); background: var(--accent); color: var(--accent-ink); padding: 3px 6px; border-radius: 4px; transform: translateY(-50%);
+}
+.show-blocks .site-header [data-mp]::before { top: -6px; }
+
+/* Developer panel */
+.panel { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); background: var(--panel); color: var(--panel-ink); border-radius: 12px; overflow: hidden; font-size: 13px; max-height: calc(100dvh - 32px); display: flex; flex-direction: column; }
+.panel-head { padding: 14px 16px; border-bottom: 1px solid var(--panel-line); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.panel-head strong { font-family: var(--f-mono); font-weight: 500; letter-spacing: 0.02em; }
+.backend { font-family: var(--f-mono); font-size: 11px; color: var(--signal); border: 1px solid currentColor; border-radius: 999px; padding: 2px 8px; }
+.panel-body { overflow: auto; padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 4px; }
+.panel h3 { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--panel-muted); font-weight: 600; margin: 14px 0 8px; }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.pbtn { background: transparent; color: var(--panel-ink); border: 1px solid var(--panel-line); border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 12.5px; text-align: left; }
+.pbtn:hover { border-color: var(--panel-muted); }
+.pbtn small { display: block; font-family: var(--f-mono); font-size: 10.5px; color: var(--panel-muted); }
+.pbtn:focus-visible, .chrome-btn:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.who { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; font-family: var(--f-mono); font-size: 12px; }
+.who dt { color: var(--panel-muted); }
+.who dd { margin: 0; overflow-wrap: anywhere; }
+.pill { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid currentColor; }
+.s-active { color: var(--signal); } .s-pending { color: var(--warn); } .s-suspended, .s-anon { color: var(--bad); }
+.rls { width: 100%; border-collapse: collapse; font-family: var(--f-mono); font-size: 11.5px; }
+.rls td { padding: 6px 4px; border-top: 1px solid var(--panel-line); vertical-align: top; }
+.rls td:nth-child(2) { text-align: right; font-variant-numeric: tabular-nums; color: var(--signal); white-space: nowrap; }
+.rls td:nth-child(3) { color: var(--panel-muted); }
+.rls tr.zero td:nth-child(2) { color: var(--bad); }
+.log { font-family: var(--f-mono); font-size: 11.5px; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; max-height: 190px; overflow: auto; }
+.log li { color: var(--panel-muted); }
+.log li b { color: var(--panel-ink); font-weight: 500; }
+.log time { color: #5f6c65; margin-right: 6px; }
+.hint { color: var(--panel-muted); font-size: 12px; margin: 0; line-height: 1.5; }
+
+.inbox { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 2147483001; width: min(340px, calc(100vw - 32px)); background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.inbox small { font-family: var(--f-mono); color: var(--muted); font-size: 11px; }
+.inbox .row { display: flex; gap: 8px; margin-top: 4px; }
+
+@media (max-width: 1080px) {
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .panel { position: static; max-height: none; }
+}
+@media (max-width: 720px) {
+  .site-header { padding: 14px 18px; gap: 12px 20px; justify-content: space-between; }
+  .site-nav { order: 3; flex-basis: 100%; gap: 18px; }
+  main#site-main { padding: 28px 18px 40px; }
+  .hero { grid-template-columns: 1fr; gap: 20px; }
+  .hero h2 { font-size: 2rem; }
+  .site-footer { padding: 16px 18px; }
+  .address .path-host { display: none; }
+}
+</style>
+
+<div class="stage" id="stage">
+  <header class="intro">
+    <div>
+      <h1>Members marketplace on Supabase + Squarespace</h1>
+      <p>A working prototype. The website is built only from Squarespace Code Blocks. The developer panel shows what Supabase Auth and Row Level Security allow for whoever is signed in.</p>
+    </div>
+    <div class="stack" aria-label="Stack">
+      <span class="tag">Supabase Auth</span><span class="tag">Postgres RLS</span><span class="tag">Storage</span><span class="tag">Vanilla ES2020</span><span class="tag">Squarespace 7.1</span>
+    </div>
+  </header>
+
+  <div class="browser">
+    <div class="chrome">
+      <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      <div class="address" id="address" aria-label="Current page address"></div>
+      <button class="chrome-btn" id="toggle-blocks" type="button" aria-pressed="false">Show code blocks</button>
+    </div>
+
+    <header class="site-header">
+      <a class="logo" href="/" data-nav>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 20V9l8-5 8 5v11"/><path d="M9 20v-6h6v6"/></svg>
+        Makers Guild
+      </a>
+      <nav class="site-nav" aria-label="Site">
+        <a href="/" data-nav>Home</a>
+        <a href="/marketplace" data-nav>Marketplace</a>
+        <a href="/sell" data-nav>Sell</a>
+      </nav>
+      <div data-mp="auth-nav"></div>
+    </header>
+
+    <main id="site-main"></main>
+
+    <footer class="site-footer">
+      <span>© 2026 Makers Guild · fictional site for this prototype</span>
+      <span>Member pages are set to noindex</span>
+    </footer>
+  </div>
+
+  <aside class="panel" aria-label="Developer panel">
+    <div class="panel-head"><strong>dev panel</strong><span class="backend" id="backend">mock backend</span></div>
+    <div class="panel-body">
+      <h3>Try it as</h3>
+      <div class="btns">
+        <button class="pbtn" type="button" data-as="member@demo.com">Active member<small>member@demo.com</small></button>
+        <button class="pbtn" type="button" data-as="pending@demo.com">Pending member<small>pending@demo.com</small></button>
+        <button class="pbtn" type="button" id="as-visitor">Visitor<small>signed out</small></button>
+      </div>
+      <p class="hint">Password for demo accounts: <code>demo1234</code>. You can also sign up with any email. New accounts start as pending.</p>
+
+      <h3>Session</h3>
+      <dl class="who" id="who"></dl>
+
+      <h3>Admin (service role only)</h3>
+      <div class="btns">
+        <button class="pbtn" type="button" data-status="active">Approve</button>
+        <button class="pbtn" type="button" data-status="pending">Set pending</button>
+        <button class="pbtn" type="button" data-status="suspended">Suspend</button>
+      </div>
+      <p class="hint">These change <code>profiles.membership_status</code>. The browser has no permission to do this in production.</p>
+
+      <h3>What RLS returns right now</h3>
+      <table class="rls"><tbody id="rls"></tbody></table>
+
+      <h3>Event log</h3>
+      <ol class="log" id="log"></ol>
+
+      <h3>Demo data</h3>
+      <div class="btns"><button class="pbtn" type="button" id="reset-data">Reset demo data</button></div>
+    </div>
+  </aside>
+</div>
+
+<!-- Pages. Each one is what you'd build in Squarespace: normal content plus Code Blocks. -->
+<template data-page="/">
+  <section class="hero">
+    <div>
+      <h2>A members’ marketplace for independent makers</h2>
+      <p>Furniture, ceramics, prints and services, bought and sold inside the guild. Members see prices, photos and seller contacts.</p>
+      <div class="mp-actions" style="margin-top:18px"><a class="mp-btn" href="/marketplace" data-nav>Browse the marketplace</a><a class="mp-btn mp-btn-ghost" href="/join" data-nav>Become a member</a></div>
+    </div>
+    <div class="hero-art" aria-hidden="true"><span>Made by members</span></div>
+  </section>
+  <h3 class="section-title">Fresh from members</h3>
+  <div data-mp="marketplace" data-limit="4"></div>
+</template>
+
+<template data-page="/marketplace">
+  <div class="page-head"><h2>Marketplace</h2><p>Search, filter and save listings from fellow members.</p></div>
+  <div data-mp="marketplace"></div>
+</template>
+
+<template data-page="/login">
+  <div data-mp="login"></div>
+</template>
+<template data-page="/join">
+  <div data-mp="signup"></div>
+</template>
+<template data-page="/forgot-password">
+  <div data-mp="forgot"></div>
+</template>
+<template data-page="/reset-password">
+  <div data-mp="reset"></div>
+</template>
+
+<template data-page="/saved">
+  <div class="page-head"><h2>Saved listings</h2><p>Everything you’ve bookmarked, in one place.</p></div>
+  <div data-mp="saved"></div>
+</template>
+<template data-page="/sell">
+  <div class="page-head"><h2>Sell with the guild</h2><p>Photos are stored in a private bucket and shown to members through short-lived signed links.</p></div>
+  <div data-mp="sell"></div>
+</template>
+<template data-page="/account">
+  <div data-mp="account"></div>
+</template>
+
+<script>
+/* Demo-only backend: same interface as the Supabase backend in mp.js and the
+ * same access rules as the migration in supabase/migrations (RLS), kept in localStorage.
+ * Lets the prototype run with zero setup. Never ship this to production. */
+(function (w) {
+  'use strict';
+
+  const KEY = 'mp_mock_v1';
+  const CATS = ['Furniture', 'Art & Prints', 'Ceramics', 'Textiles', 'Lighting', 'Services'];
+
+  function hue(s) { let n = 0; for (const c of s) n = (n * 31 + c.charCodeAt(0)) % 360; return n; }
+
+  // Little generated "product photos" so the demo needs no external images.
+  function art(seed, cat) {
+    const h = hue(seed);
+    const h2 = (h + 35) % 360;
+    const shapes = {
+      Furniture: `<rect x="70" y="120" width="260" height="60" rx="14" fill="hsl(${h2} 35% 38%)"/><rect x="90" y="80" width="220" height="55" rx="18" fill="hsl(${h2} 40% 48%)"/><rect x="90" y="178" width="12" height="40" fill="#3b2f2a"/><rect x="298" y="178" width="12" height="40" fill="#3b2f2a"/>`,
+      'Art & Prints': `<rect x="110" y="45" width="180" height="200" fill="#fbf7f0" stroke="#2f2a26" stroke-width="10"/><circle cx="200" cy="120" r="38" fill="hsl(${h2} 65% 55%)"/><path d="M128 225 L180 160 L215 195 L240 170 L275 225Z" fill="hsl(${h} 30% 35%)"/>`,
+      Ceramics: `<path d="M150 70 h100 c0 30 40 50 40 105 c0 50 -40 70 -90 70 s-90 -20 -90 -70 c0 -55 40 -75 40 -105z" fill="hsl(${h2} 30% 62%)"/><rect x="146" y="60" width="108" height="16" rx="8" fill="hsl(${h2} 30% 50%)"/><path d="M118 170 q82 30 164 0" stroke="#fff" stroke-opacity=".5" stroke-width="6" fill="none"/>`,
+      Textiles: `<g fill="hsl(${h2} 45% 50%)"><rect x="95" y="60" width="210" height="180" rx="8"/></g><g stroke="#fff" stroke-opacity=".55" stroke-width="8"><path d="M95 100h210M95 140h210M95 180h210M95 220h210"/></g><path d="M140 60v180M200 60v180M260 60v180" stroke="hsl(${h} 40% 30%)" stroke-opacity=".35" stroke-width="6"/>`,
+      Lighting: `<path d="M150 70 h100 l35 85 h-170z" fill="hsl(${h2} 60% 58%)"/><rect x="194" y="155" width="12" height="70" fill="#2f2a26"/><rect x="160" y="225" width="80" height="12" rx="6" fill="#2f2a26"/><circle cx="200" cy="168" r="70" fill="hsl(50 100% 80%)" opacity=".25"/>`,
+      Services: `<circle cx="200" cy="120" r="55" fill="hsl(${h2} 40% 50%)"/><rect x="120" y="185" width="160" height="70" rx="35" fill="hsl(${h2} 40% 40%)"/><circle cx="200" cy="120" r="22" fill="#fff" opacity=".35"/>`,
+    };
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${h} 40% 90%)"/><stop offset="1" stop-color="hsl(${h} 30% 78%)"/></linearGradient></defs><rect width="400" height="300" fill="url(#g)"/><ellipse cx="200" cy="262" rx="150" ry="14" fill="#000" opacity=".08"/>${shapes[cat] || shapes.Services}</svg>`;
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  }
+
+  function uuid() {
+    return (crypto.randomUUID && crypto.randomUUID()) ||
+      'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0; return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+      });
+  }
+
+  function seed() {
+    const sellers = [
+      { id: 'u-seller-1', email: 'ines@demo.com', password: 'demo1234', display_name: 'Inés Duarte', membership_status: 'active', role: 'member' },
+      { id: 'u-seller-2', email: 'theo@demo.com', password: 'demo1234', display_name: 'Theo Marsh', membership_status: 'active', role: 'member' },
+      { id: 'u-seller-3', email: 'amara@demo.com', password: 'demo1234', display_name: 'Amara Okafor', membership_status: 'active', role: 'member' },
+    ];
+    const users = [
+      { id: 'u-member', email: 'member@demo.com', password: 'demo1234', display_name: 'Jordan Lee', membership_status: 'active', role: 'member' },
+      { id: 'u-pending', email: 'pending@demo.com', password: 'demo1234', display_name: 'Sam Rivera', membership_status: 'pending', role: 'member' },
+      ...sellers,
+    ];
+    const L = (title, category, city, price, s, days, description) =>
+      ({ title, category, city, price_cents: price * 100, seller: s, days, description });
+    const raw = [
+      L('Walnut lounge chair, restored', 'Furniture', 'Portland', 680, 0, 1, 'Mid-century walnut frame, re-oiled and fitted with new wool cushions. Small mark on the left arm (see photo 3). Pickup only.'),
+      L('Hand-thrown stoneware vase', 'Ceramics', 'Austin', 95, 2, 2, 'Tall speckled stoneware vase, food safe glaze inside. 32 cm. Signed on the base.'),
+      L('Limited risograph print — "Tidal"', 'Art & Prints', 'Brooklyn', 60, 1, 3, 'Two-color riso print, edition of 50, A3. Ships flat in a rigid mailer.'),
+      L('Linen throw, natural dye', 'Textiles', 'Portland', 140, 0, 4, 'Heavyweight Lithuanian linen dyed with madder root. 130 × 180 cm.'),
+      L('Brass task lamp', 'Lighting', 'Chicago', 210, 1, 5, 'Solid brass articulating lamp, rewired with cloth cord and a dimmable LED bulb.'),
+      L('Interior styling session (2h)', 'Services', 'Remote', 150, 2, 6, 'Video consult: layout, color and sourcing list for one room. Includes a written follow-up.'),
+      L('Oak dining bench', 'Furniture', 'Denver', 420, 2, 7, 'White oak, 180 cm, hand-cut joinery. Seats three comfortably.'),
+      L('Set of 4 matte mugs', 'Ceramics', 'Brooklyn', 72, 1, 8, 'Wheel-thrown, 350 ml, dishwasher safe. Each one slightly different.'),
+      L('Woven wall hanging', 'Textiles', 'Austin', 180, 0, 9, 'Merino and cotton, 60 × 90 cm, with a reclaimed driftwood rod.'),
+      L('Paper pendant shade', 'Lighting', 'Portland', 85, 2, 10, 'Handmade mulberry paper on a bamboo frame. 45 cm diameter.'),
+      L('Original gouache landscape', 'Art & Prints', 'Denver', 320, 0, 12, 'Gouache on cotton paper, 30 × 40 cm, framed in ash.'),
+      L('Custom upholstery service', 'Services', 'Chicago', 250, 1, 14, 'Re-upholster one chair or ottoman. Fabric sourcing available. Price is from.'),
+      L('Rattan side table', 'Furniture', 'Austin', 130, 1, 16, 'Vintage rattan, very sturdy, 50 cm tall.'),
+      L('Ceramic table lamp base', 'Lighting', 'Brooklyn', 175, 2, 18, 'Glazed stoneware base with linen shade. UL-listed fittings.'),
+    ];
+    const now = Date.now();
+    const listings = raw.map((r, i) => {
+      const s = sellers[r.seller];
+      const id = `l-${String(i + 1).padStart(2, '0')}`;
+      return {
+        id, seller_id: s.id, seller_display_name: s.display_name, title: r.title, description: r.description,
+        category: r.category, city: r.city, price_cents: r.price_cents, contact_email: s.email,
+        image_path: `${s.id}/${id}.svg`, status: 'published',
+        created_at: new Date(now - r.days * 86400000).toISOString(),
+      };
+    });
+    listings.push({ // a draft: visible to its seller only — useful to demo RLS
+      id: 'l-draft', seller_id: 'u-seller-1', seller_display_name: 'Inés Duarte', title: 'Unfinished: cane armchair',
+      description: 'Draft listing', category: 'Furniture', city: 'Portland', price_cents: 0, contact_email: '',
+      image_path: null, status: 'draft', created_at: new Date(now).toISOString(),
+    });
+    const saved = [{ user_id: 'u-member', listing_id: 'l-02', created_at: new Date(now - 3600e3).toISOString() }];
+    return { users, listings, saved, session: null };
+  }
+
+  function create(opts) {
+    const o = Object.assign({ latency: 260, onEmail: () => {}, onLog: () => {} }, opts);
+    let db;
+    try { db = JSON.parse(localStorage.getItem(KEY)) || seed(); } catch { db = seed(); }
+    const blobs = {}; // uploaded images (object URLs), in-memory only
+    const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch { /* blocked */ } };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms == null ? o.latency * (0.6 + Math.random() * 0.8) : ms));
+    const clone = (x) => JSON.parse(JSON.stringify(x));
+    const subs = new Set();
+    const recoveryTokens = {};
+
+    const uid = () => (db.session ? db.session.user.id : null);
+    const me = () => db.users.find((u) => u.id === uid()) || null;
+    const isActive = () => !!me() && me().membership_status === 'active';
+    const rlsError = (table) => Object.assign(new Error(`new row violates row-level security policy for table "${table}"`), { code: '42501' });
+
+    function makeSession(u) {
+      return {
+        access_token: `mock.${btoa(JSON.stringify({ sub: u.id, role: 'authenticated', email: u.email })).replace(/=+$/, '')}.sig`,
+        token_type: 'bearer',
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        user: { id: u.id, email: u.email, aud: 'authenticated', role: 'authenticated', user_metadata: { display_name: u.display_name } },
+      };
+    }
+
+    function fire(event) {
+      persist();
+      o.onLog(`auth: ${event}`);
+      const s = clone(db.session);
+      subs.forEach((cb) => cb(event, s));
+    }
+
+    // RLS: listings select policy
+    const canSee = (l) => (l.status === 'published' && isActive()) || l.seller_id === uid();
+    const rowsFor = () => db.listings.filter(canSee);
+
+    const api = {
+      name: 'mock',
+      auth: {
+        onChange(cb) {
+          subs.add(cb);
+          setTimeout(() => { o.onLog('auth: INITIAL_SESSION'); cb('INITIAL_SESSION', clone(db.session)); }, 120);
+          return () => subs.delete(cb);
+        },
+        async signIn(email, password) {
+          await wait();
+          const u = db.users.find((x) => x.email.toLowerCase() === email.toLowerCase());
+          if (!u || u.password !== password) throw new Error('Invalid login credentials');
+          db.session = makeSession(u);
+          fire('SIGNED_IN');
+        },
+        async signUp(email, password, displayName) {
+          await wait();
+          if (password.length < 8) throw new Error('Password should be at least 8 characters.');
+          if (db.users.some((x) => x.email.toLowerCase() === email.toLowerCase())) throw new Error('User already registered');
+          // Mirrors the handle_new_user() trigger: new profiles start as "pending".
+          const u = { id: `u-${uuid().slice(0, 8)}`, email, password, display_name: displayName.slice(0, 80), membership_status: 'pending', role: 'member' };
+          db.users.push(u);
+          db.session = makeSession(u); // demo: email confirmation off → immediate session
+          fire('SIGNED_IN');
+          return { session: db.session, user: db.session.user };
+        },
+        async signOut() { await wait(80); db.session = null; fire('SIGNED_OUT'); },
+        async sendReset(email) {
+          await wait();
+          const u = db.users.find((x) => x.email.toLowerCase() === email.toLowerCase());
+          if (u) { const t = uuid(); recoveryTokens[t] = u.id; o.onEmail({ to: u.email, token: t }); }
+        },
+        async updatePassword(password) {
+          await wait();
+          if (!me()) throw new Error('Auth session missing!');
+          if (password.length < 8) throw new Error('Password should be at least 8 characters.');
+          me().password = password;
+          fire('USER_UPDATED');
+        },
+      },
+      async getProfile(id) {
+        await wait(60);
+        if (id !== uid()) return null; // profiles: read own
+        const u = me();
+        return { id: u.id, display_name: u.display_name, membership_status: u.membership_status, role: u.role };
+      },
+      async listListings({ q, category, maxPrice, sort, page }) {
+        await wait();
+        const terms = (q || '').toLowerCase().split(/\s+/).filter(Boolean);
+        let rows = rowsFor().filter((l) => l.status === 'published')
+          .filter((l) => !category || l.category === category)
+          .filter((l) => !maxPrice || l.price_cents <= maxPrice * 100)
+          .filter((l) => terms.every((t) => `${l.title} ${l.description}`.toLowerCase().includes(t)));
+        const by = { price_asc: (a, b) => a.price_cents - b.price_cents, price_desc: (a, b) => b.price_cents - a.price_cents };
+        rows.sort(by[sort] || ((a, b) => b.created_at.localeCompare(a.created_at)));
+        const size = (w.MP && w.MP.config.pageSize) || 12;
+        return { rows: clone(rows.slice(page * size, page * size + size)), total: rows.length };
+      },
+      async listPreviews({ category, limit }) {
+        await wait();
+        return db.listings.filter((l) => l.status === 'published' && (!category || l.category === category))
+          .sort((a, b) => b.created_at.localeCompare(a.created_at))
+          .slice(0, Math.min(limit || 12, 24))
+          .map(({ id, title, category: c, city, created_at }) => ({ id, title, category: c, city, created_at }));
+      },
+      async getListing(id) { await wait(); const l = rowsFor().find((x) => x.id === id); return l ? clone(l) : null; },
+      async savedIds() { await wait(80); return new Set(db.saved.filter((s) => s.user_id === uid()).map((s) => s.listing_id)); },
+      async listSaved() {
+        await wait();
+        const visible = new Map(rowsFor().map((l) => [l.id, l]));
+        return clone(db.saved.filter((s) => s.user_id === uid())
+          .sort((a, b) => b.created_at.localeCompare(a.created_at))
+          .map((s) => visible.get(s.listing_id)).filter(Boolean));
+      },
+      async save(listingId) {
+        await wait(180);
+        if (!isActive()) throw rlsError('saved_listings');
+        if (!db.saved.some((s) => s.user_id === uid() && s.listing_id === listingId)) {
+          db.saved.push({ user_id: uid(), listing_id: listingId, created_at: new Date().toISOString() });
+          persist();
+        }
+      },
+      async unsave(listingId) {
+        await wait(180);
+        db.saved = db.saved.filter((s) => !(s.user_id === uid() && s.listing_id === listingId));
+        persist();
+      },
+      async createListing(sellerId, fields, file) {
+        await wait(500);
+        if (!isActive() || sellerId !== uid()) throw rlsError('listings');
+        const id = `l-${uuid().slice(0, 8)}`;
+        let image_path = null;
+        if (file) { image_path = `${uid()}/${id}.${file.type.split('/')[1]}`; blobs[image_path] = URL.createObjectURL(file); }
+        db.listings.push({ id, seller_id: uid(), seller_display_name: me().display_name, status: 'published',
+          created_at: new Date().toISOString(), image_path, ...fields });
+        persist();
+        return { id };
+      },
+      async signImages(paths) {
+        await wait(80);
+        if (!isActive()) return {}; // storage policy: active members only
+        const out = {};
+        paths.forEach((p) => {
+          if (blobs[p]) { out[p] = blobs[p]; return; }
+          const l = db.listings.find((x) => x.image_path === p);
+          if (l) out[p] = art(l.id + l.title, l.category);
+        });
+        return out;
+      },
+    };
+
+    // Developer helpers for the demo panel (an admin/service-role would do these).
+    api.debug = {
+      current: () => ({ session: clone(db.session), user: me() && { ...me(), password: undefined } }),
+      async loginAs(email) { await api.auth.signIn(email, db.users.find((u) => u.email === email).password); },
+      setStatus(status) {
+        if (!me()) return;
+        me().membership_status = status;
+        persist();
+        o.onLog(`admin: membership_status → ${status}`);
+        if (w.MP) w.MP.refreshProfile();
+      },
+      useRecovery(token) {
+        const id = recoveryTokens[token];
+        if (!id) return false;
+        delete recoveryTokens[token];
+        db.session = makeSession(db.users.find((u) => u.id === id));
+        fire('PASSWORD_RECOVERY');
+        return true;
+      },
+      reset() { try { localStorage.removeItem(KEY); } catch { /* blocked */ } },
+      // What each table/function returns for the *current* JWT — mirrors RLS.
+      rlsReport() {
+        const role = !uid() ? 'anon' : isActive() ? 'authenticated · active member' : `authenticated · ${me().membership_status}`;
+        return {
+          role,
+          rows: [
+            ['rpc get_listing_previews()', db.listings.filter((l) => l.status === 'published').length, 'teaser columns only'],
+            ['select listings', uid() ? rowsFor().length : 0, isActive() ? 'published + own drafts' : uid() ? 'own listings only' : 'blocked by RLS'],
+            ['select saved_listings', db.saved.filter((s) => s.user_id === uid()).length, uid() ? 'own rows only' : 'blocked by RLS'],
+            ['storage listing-images', isActive() ? 'signed URLs' : 0, isActive() ? '1h expiry' : 'blocked by policy'],
+            ['update profiles.membership_status', '✕', 'no column grant'],
+          ],
+        };
+      },
+    };
+    return api;
+  }
+
+  w.MPMock = { create, CATEGORIES: CATS };
+})(window);
+
+</script>
+<script>
+(function () {
+  'use strict';
+  const $ = (s) => document.querySelector(s);
+  const main = $('#site-main');
+  const route = { path: '/', query: new URLSearchParams() };
+  const HOST = 'members.makersguild.com';
+
+  function log(text, strong) {
+    const li = document.createElement('li');
+    const t = document.createElement('time');
+    t.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const b = document.createElement('b');
+    b.textContent = strong || '';
+    li.append(t, b, strong ? ' ' : '', text);
+    const ol = $('#log');
+    ol.prepend(li);
+    while (ol.children.length > 40) ol.lastChild.remove();
+  }
+
+  function renderAddress() {
+    const q = route.query.toString();
+    const a = $('#address');
+    a.replaceChildren();
+    const host = document.createElement('span');
+    host.className = 'path-host';
+    host.textContent = `https://${HOST}`;
+    const p = document.createElement('b');
+    p.textContent = route.path;
+    a.append(host, p, q ? `?${decodeURIComponent(q)}` : '');
+  }
+
+  function render() {
+    const tpl = document.querySelector(`template[data-page="${route.path}"]`) || document.querySelector('template[data-page="/"]');
+    if (window.MP && MP.config.protectedPaths.includes(route.path)) document.documentElement.classList.add('mp-pending');
+    main.replaceChildren(tpl.content.cloneNode(true));
+    document.querySelectorAll('.site-nav a').forEach((a) => {
+      if (a.getAttribute('href') === route.path) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    renderAddress();
+    if (window.MP) MP.mount(main);
+  }
+
+  function navigate(url) {
+    const u = new URL(url, `https://${HOST}`);
+    const from = route.path;
+    route.path = u.pathname.replace(/\/+$/, '') || '/';
+    route.query = u.searchParams;
+    if (from !== route.path || u.search) log(`${route.path}${u.search}`, 'nav');
+    document.querySelectorAll('dialog[open]').forEach((d) => d.close());
+    render();
+    document.getElementById('stage').scrollIntoView({ block: 'start' });
+  }
+
+  // Intercept site links so the whole demo runs in one page.
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a[data-nav]');
+    if (!a) return;
+    e.preventDefault();
+    navigate(a.getAttribute('href'));
+  });
+
+  function showEmail({ to, token }) {
+    log(`password reset email → ${to}`, 'mail');
+    document.querySelectorAll('.inbox').forEach((n) => n.remove());
+    const box = document.createElement('div');
+    box.className = 'inbox';
+    box.setAttribute('role', 'status');
+    box.innerHTML = '<small>Simulated inbox</small><strong>Reset your Makers Guild password</strong><span>Someone asked to reset the password for this account. The link expires in 1 hour.</span><div class="row"><button class="mp-btn mp-btn-sm" type="button" data-open>Open reset link</button><button class="mp-btn mp-btn-sm mp-btn-ghost" type="button" data-dismiss>Dismiss</button></div>';
+    box.querySelector('small').textContent = `Simulated inbox · to ${to}`;
+    box.querySelector('[data-open]').onclick = () => {
+      box.remove();
+      navigate('/reset-password');
+      setTimeout(() => mock.debug.useRecovery(token), 300);
+    };
+    box.querySelector('[data-dismiss]').onclick = () => box.remove();
+    document.body.append(box);
+  }
+
+  const mock = window.MPMock.create({ onEmail: showEmail, onLog: (t) => log(t.replace(/^\w+: /, ''), t.split(':')[0]) });
+  window.__mock = mock;
+
+  window.MP_CONFIG = {
+    backend: mock,
+    pageSize: 8,
+    router: {
+      path: () => route.path,
+      query: () => new URLSearchParams(route.query),
+      go: (url) => {
+        if (/\?next=/.test(url) && url.startsWith('/login')) log(`protected page → ${url}`, 'guard');
+        navigate(url);
+      },
+      setQuery(params) {
+        Object.entries(params).forEach(([k, v]) => (v ? route.query.set(k, v) : route.query.delete(k)));
+        renderAddress();
+      },
+    },
+  };
+
+  // Dev panel
+  function renderPanel() {
+    const cur = mock.debug.current();
+    const who = $('#who');
+    who.replaceChildren();
+    const row = (k, v) => {
+      const dt = document.createElement('dt'); dt.textContent = k;
+      const dd = document.createElement('dd');
+      dd.append(v);
+      who.append(dt, dd);
+    };
+    if (!cur.session) {
+      const s = document.createElement('span'); s.className = 'pill s-anon'; s.textContent = 'anon';
+      row('role', s);
+      row('jwt', 'none (anon key only)');
+    } else {
+      const s = document.createElement('span');
+      s.className = `pill s-${cur.user.membership_status}`;
+      s.textContent = cur.user.membership_status;
+      row('email', cur.user.email);
+      row('sub', cur.session.user.id);
+      row('role', 'authenticated');
+      row('member', s);
+      row('expires', new Date(cur.session.expires_at * 1000).toLocaleTimeString());
+    }
+    const rep = mock.debug.rlsReport();
+    const tb = $('#rls');
+    tb.replaceChildren();
+    rep.rows.forEach(([q, n, note]) => {
+      const tr = document.createElement('tr');
+      if (n === 0 || n === '✕') tr.className = 'zero';
+      [q, n, note].forEach((c) => { const td = document.createElement('td'); td.textContent = c; tr.append(td); });
+      tb.append(tr);
+    });
+  }
+
+  document.addEventListener('mp:auth', renderPanel);
+  setInterval(renderPanel, 1000); // keep RLS counts current as you save/post
+  document.querySelectorAll('[data-as]').forEach((b) => b.addEventListener('click', async () => {
+    if (mock.debug.current().session) await MP.api.auth.signOut();
+    await mock.debug.loginAs(b.dataset.as);
+    navigate('/marketplace');
+  }));
+  $('#as-visitor').addEventListener('click', async () => {
+    if (mock.debug.current().session) await MP.api.auth.signOut();
+    navigate('/marketplace');
+  });
+  document.querySelectorAll('[data-status]').forEach((b) => b.addEventListener('click', () => {
+    if (!mock.debug.current().session) { MP.toast('Sign in first, then change that account’s status.'); return; }
+    mock.debug.setStatus(b.dataset.status);
+  }));
+  $('#reset-data').addEventListener('click', () => { mock.debug.reset(); location.reload(); });
+  $('#toggle-blocks').addEventListener('click', (e) => {
+    const on = document.body.classList.toggle('show-blocks');
+    e.currentTarget.setAttribute('aria-pressed', String(on));
+  });
+
+  render();
+  renderPanel();
+  log('page loaded with mock backend', 'init');
+})();
+</script>
+<script>
+/*! Members Marketplace for Squarespace — v1.0.0
+ *  Vanilla JS, no build step. Requires @supabase/supabase-js v2 (UMD) unless a
+ *  custom backend is supplied (the demo uses a mock with the same interface).
+ *
+ *  Usage: set window.MP_CONFIG before this script, then place
+ *  <div data-mp="marketplace"></div> (or login, signup, saved, …) in any
+ *  Squarespace Code Block.
+ */
+(function (w, d) {
+  'use strict';
+  if (w.MP && w.MP.version) return; // guard against double injection
+
+  // ---------------------------------------------------------------------------
+  // Config
+  // ---------------------------------------------------------------------------
+  const DEFAULTS = {
+    supabaseUrl: '',
+    supabaseAnonKey: '', // public anon key only — never the service_role key
+    bucket: 'listing-images',
+    pageSize: 12,
+    currency: 'USD',
+    categories: ['Furniture', 'Art & Prints', 'Ceramics', 'Textiles', 'Lighting', 'Services'],
+    paths: {
+      home: '/',
+      login: '/login',
+      signup: '/join',
+      forgot: '/forgot-password',
+      reset: '/reset-password',
+      marketplace: '/marketplace',
+      saved: '/saved',
+      sell: '/sell',
+      account: '/account',
+    },
+    protectedPaths: ['/saved', '/sell', '/account'],
+    backend: null, // optional custom backend (demo/mock)
+    router: null, // optional custom router (demo uses hash routing)
+  };
+
+  const userCfg = w.MP_CONFIG || {};
+  const cfg = Object.assign({}, DEFAULTS, userCfg, {
+    paths: Object.assign({}, DEFAULTS.paths, userCfg.paths),
+  });
+
+  // ---------------------------------------------------------------------------
+  // Router (real page navigations on Squarespace; overridable for the demo)
+  // ---------------------------------------------------------------------------
+  const router = cfg.router || {
+    path: () => location.pathname.replace(/\/+$/, '') || '/',
+    query: () => new URLSearchParams(location.search),
+    go: (url) => location.assign(url),
+    setQuery(params) {
+      const url = new URL(location.href);
+      Object.entries(params).forEach(([k, v]) =>
+        v ? url.searchParams.set(k, v) : url.searchParams.delete(k));
+      history.replaceState(history.state, '', url);
+    },
+  };
+
+  // Only allow same-site relative redirects, and never back to an auth page.
+  function safeNext(raw) {
+    const p = cfg.paths;
+    if (!raw || raw[0] !== '/' || raw.startsWith('//') || raw.includes('\\')) return p.marketplace;
+    const path = raw.split(/[?#]/)[0];
+    if ([p.login, p.signup, p.forgot, p.reset].includes(path)) return p.marketplace;
+    return raw;
+  }
+
+  function withNext(path, next) {
+    return next ? `${path}?next=${encodeURIComponent(next)}` : path;
+  }
+
+  function currentUrl() {
+    const q = router.query().toString();
+    return router.path() + (q ? `?${q}` : '');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Supabase backend (the only thing that talks to the network)
+  // ---------------------------------------------------------------------------
+  function createSupabaseBackend() {
+    if (!w.supabase || !w.supabase.createClient) {
+      throw new Error('[MP] supabase-js not loaded. Add it to Header Code Injection.');
+    }
+    const sb = w.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' },
+    });
+    const origin = location.origin;
+    const must = ({ data, error }) => { if (error) throw error; return data; };
+    const LISTING_COLS =
+      'id,title,description,category,city,price_cents,contact_email,image_path,seller_id,seller_display_name,created_at';
+
+    return {
+      name: 'supabase',
+      client: sb,
+      auth: {
+        onChange(cb) {
+          const { data } = sb.auth.onAuthStateChange(cb);
+          return () => data.subscription.unsubscribe();
+        },
+        async signIn(email, password) {
+          must(await sb.auth.signInWithPassword({ email, password }));
+        },
+        async signUp(email, password, displayName) {
+          return must(await sb.auth.signUp({
+            email,
+            password,
+            options: {
+              data: { display_name: displayName },
+              emailRedirectTo: origin + cfg.paths.login,
+            },
+          }));
+        },
+        async signOut() { must(await sb.auth.signOut()); },
+        async sendReset(email) {
+          must(await sb.auth.resetPasswordForEmail(email, { redirectTo: origin + cfg.paths.reset }));
+        },
+        async updatePassword(password) { must(await sb.auth.updateUser({ password })); },
+      },
+      async getProfile(uid) {
+        return must(await sb.from('profiles')
+          .select('id,display_name,membership_status,role').eq('id', uid).maybeSingle());
+      },
+      async listListings({ q, category, maxPrice, sort, page }) {
+        const from = page * cfg.pageSize;
+        let query = sb.from('listings')
+          .select(LISTING_COLS, { count: 'exact' })
+          .eq('status', 'published');
+        if (q) query = query.textSearch('fts', q, { type: 'websearch', config: 'english' });
+        if (category) query = query.eq('category', category);
+        if (maxPrice) query = query.lte('price_cents', Math.round(maxPrice * 100));
+        const [col, dir] = ({
+          newest: ['created_at', false],
+          price_asc: ['price_cents', true],
+          price_desc: ['price_cents', false],
+        })[sort] || ['created_at', false];
+        query = query.order(col, { ascending: dir }).range(from, from + cfg.pageSize - 1);
+        const { data, error, count } = await query;
+        if (error) throw error;
+        return { rows: data, total: count || 0 };
+      },
+      async listPreviews({ category, limit }) {
+        return must(await sb.rpc('get_listing_previews', { p_category: category || null, p_limit: limit }));
+      },
+      async getListing(id) {
+        return must(await sb.from('listings').select(LISTING_COLS).eq('id', id).maybeSingle());
+      },
+      async savedIds() {
+        return new Set(must(await sb.from('saved_listings').select('listing_id')).map((r) => r.listing_id));
+      },
+      async listSaved() {
+        const rows = must(await sb.from('saved_listings')
+          .select(`created_at, listing:listings(${LISTING_COLS})`)
+          .order('created_at', { ascending: false }));
+        return rows.map((r) => r.listing).filter(Boolean); // RLS may null out archived listings
+      },
+      async save(listingId) {
+        const { error } = await sb.from('saved_listings').insert({ listing_id: listingId });
+        if (error && error.code !== '23505') throw error; // already saved = fine
+      },
+      async unsave(listingId) {
+        must(await sb.from('saved_listings').delete().eq('listing_id', listingId));
+      },
+      async createListing(uid, fields, file) {
+        let image_path = null;
+        if (file) {
+          const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+          image_path = `${uid}/${crypto.randomUUID()}.${ext}`; // folder = uid (enforced by storage policy)
+          must(await sb.storage.from(cfg.bucket).upload(image_path, file, {
+            cacheControl: '3600', upsert: false, contentType: file.type,
+          }));
+        }
+        return must(await sb.from('listings').insert({ ...fields, image_path }).select('id').single());
+      },
+      async signImages(paths) {
+        if (!paths.length) return {};
+        const data = must(await sb.storage.from(cfg.bucket).createSignedUrls(paths, 3600));
+        return Object.fromEntries(data.filter((x) => x.signedUrl).map((x) => [x.path, x.signedUrl]));
+      },
+    };
+  }
+
+  const api = cfg.backend || createSupabaseBackend();
+
+  // ---------------------------------------------------------------------------
+  // Auth state store
+  // ---------------------------------------------------------------------------
+  const state = { ready: false, event: null, session: null, user: null, profile: null };
+  const listeners = new Set();
+  let resolveReady;
+  const ready = new Promise((r) => (resolveReady = r));
+
+  function emit() {
+    const root = d.documentElement.classList;
+    root.toggle('mp-auth-in', !!state.user);
+    root.toggle('mp-auth-out', !state.user);
+    root.toggle('mp-member-active', isActive());
+    listeners.forEach((fn) => { try { fn(state); } catch (e) { console.error('[MP]', e); } });
+    d.dispatchEvent(new CustomEvent('mp:auth', { detail: { ...state } }));
+  }
+
+  function subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); }
+
+  // Resolves once the store reflects a signed-in user (profile loaded), so a
+  // redirect after login never lands on a guarded page before state catches up.
+  function signedIn() {
+    if (state.user) return Promise.resolve(state);
+    return new Promise((resolve) => {
+      const off = subscribe((s) => { if (s.user) { off(); resolve(s); } });
+    });
+  }
+  function isActive() { return !!state.profile && state.profile.membership_status === 'active'; }
+
+  let authSeq = 0;
+  async function handleAuth(event, session) {
+    const seq = ++authSeq;
+    const user = session ? session.user : null;
+    let profile = state.profile;
+    if (!user) profile = null;
+    else if (!profile || profile.id !== user.id || event === 'USER_UPDATED' || event === 'SIGNED_IN') {
+      try { profile = await api.getProfile(user.id); } catch (e) { console.error('[MP] profile', e); profile = null; }
+    }
+    if (seq !== authSeq) return; // a newer auth event superseded this one
+    Object.assign(state, { event, session, user, profile });
+    if (!state.ready) { state.ready = true; resolveReady(state); }
+    emit();
+  }
+
+  api.auth.onChange((event, session) => {
+    // Never await Supabase calls inside onAuthStateChange — supabase-js holds a
+    // lock during the callback, so we defer the work to the next tick.
+    setTimeout(() => handleAuth(event, session), 0);
+  });
+
+  // Fallback so pages never hang if the auth event never arrives (offline etc.)
+  setTimeout(() => { if (!state.ready) { state.ready = true; resolveReady(state); emit(); } }, 5000);
+
+  async function refreshProfile() {
+    if (!state.user) return;
+    state.profile = await api.getProfile(state.user.id);
+    emit();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Protected pages — redirect is UX; RLS is the actual security boundary.
+  // ---------------------------------------------------------------------------
+  const LOOP_KEY = 'mp_redirects';
+
+  function isProtectedPath() {
+    const p = router.path();
+    return cfg.protectedPaths.some((x) => p === x || p.startsWith(`${x}/`)) ||
+      !!d.querySelector('[data-mp="guard"]');
+  }
+
+  function tooManyRedirects() {
+    try {
+      const now = Date.now();
+      const log = JSON.parse(sessionStorage.getItem(LOOP_KEY) || '[]').filter((t) => now - t < 10000);
+      log.push(now);
+      sessionStorage.setItem(LOOP_KEY, JSON.stringify(log));
+      return log.length > 3;
+    } catch { return false; }
+  }
+
+  function reveal() { d.documentElement.classList.remove('mp-pending'); }
+
+  async function guard() {
+    if (!isProtectedPath()) { reveal(); return; }
+    await ready;
+    if (state.user) { reveal(); return; }
+    if (tooManyRedirects()) {
+      // Something is misconfigured (e.g. login page listed as protected). Fail open
+      // to a message instead of looping — data stays protected by RLS regardless.
+      reveal();
+      console.warn('[MP] redirect loop prevented');
+      return;
+    }
+    router.go(withNext(cfg.paths.login, currentUrl()));
+  }
+
+  // Signing out on a protected page sends you to login once.
+  subscribe((s) => {
+    if (s.ready && !s.user && s.event === 'SIGNED_OUT' && isProtectedPath()) {
+      router.go(cfg.paths.login);
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // DOM helpers — all user data goes through textContent (no innerHTML = no XSS)
+  // ---------------------------------------------------------------------------
+  function h(tag, attrs, ...kids) {
+    const el = d.createElement(tag);
+    Object.entries(attrs || {}).forEach(([k, v]) => {
+      if (v == null || v === false) return;
+      if (k === 'class') el.className = v;
+      else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, v === true ? '' : v);
+    });
+    kids.flat(Infinity).forEach((k) => {
+      if (k != null && k !== false) el.append(k.nodeType ? k : String(k));
+    });
+    return el;
+  }
+
+  const ICON_PATHS = {
+    heart: 'M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.1 4.3 2.5h2c.7-1.4 2.2-2.5 4.3-2.5 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z',
+    lock: 'M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5z',
+    pin: 'M12 21s-6-5.6-6-11a6 6 0 1 1 12 0c0 5.4-6 11-6 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
+    close: 'M6 6l12 12M18 6L6 18',
+    search: 'M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM21 21l-5-5',
+  };
+  function icon(name) {
+    const svg = d.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('class', `mp-icon mp-icon-${name}`);
+    svg.setAttribute('aria-hidden', 'true');
+    const path = d.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', ICON_PATHS[name]);
+    svg.append(path);
+    return svg;
+  }
+
+  const money = (cents) => new Intl.NumberFormat(undefined, {
+    style: 'currency', currency: cfg.currency, maximumFractionDigits: cents % 100 ? 2 : 0,
+  }).format(cents / 100);
+
+  const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+
+  function link(text, path, cls) {
+    return h('a', {
+      class: cls || 'mp-link',
+      href: path,
+      onclick: cfg.router ? (e) => { e.preventDefault(); router.go(path); } : null,
+    }, text);
+  }
+
+  function friendlyError(err) {
+    const msg = (err && (err.message || err.error_description)) || 'Something went wrong.';
+    if (/invalid login credentials/i.test(msg)) return 'That email and password don’t match.';
+    if (/email not confirmed/i.test(msg)) return 'Please confirm your email first — check your inbox.';
+    if (/rate limit/i.test(msg)) return 'Too many attempts. Please wait a minute and try again.';
+    return msg;
+  }
+
+  let toastHost;
+  function toast(text, kind) {
+    if (!toastHost) { toastHost = h('div', { class: 'mp mp-toasts', 'aria-live': 'polite' }); d.body.append(toastHost); }
+    const t = h('div', { class: `mp-toast ${kind ? `mp-toast-${kind}` : ''}` }, text);
+    toastHost.append(t);
+    setTimeout(() => t.classList.add('mp-out'), 3200);
+    setTimeout(() => t.remove(), 3600);
+  }
+
+  function categoryHue(cat) {
+    let n = 0;
+    for (const c of String(cat)) n = (n * 31 + c.charCodeAt(0)) % 360;
+    return n;
+  }
+
+  function placeholder(cat, locked) {
+    return h('div', { class: 'mp-ph', style: `--mp-hue:${categoryHue(cat)}` },
+      locked ? icon('lock') : h('span', null, String(cat).slice(0, 1)));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Saved items (shared across components, optimistic with rollback)
+  // ---------------------------------------------------------------------------
+  const saved = { ids: new Set(), loadedFor: null, listeners: new Set() };
+
+  async function loadSaved() {
+    if (!state.user || !isActive()) { saved.ids = new Set(); saved.loadedFor = null; return saved.ids; }
+    if (saved.loadedFor === state.user.id) return saved.ids;
+    saved.ids = await api.savedIds();
+    saved.loadedFor = state.user.id;
+    return saved.ids;
+  }
+
+  async function toggleSave(id) {
+    const was = saved.ids.has(id);
+    was ? saved.ids.delete(id) : saved.ids.add(id);
+    saved.listeners.forEach((fn) => fn(id));
+    try {
+      await (was ? api.unsave(id) : api.save(id));
+      toast(was ? 'Removed from saved' : 'Saved to your list');
+    } catch (e) {
+      was ? saved.ids.add(id) : saved.ids.delete(id);
+      saved.listeners.forEach((fn) => fn(id));
+      toast(friendlyError(e), 'error');
+    }
+  }
+
+  function saveButton(id, label) {
+    const btn = h('button', {
+      type: 'button',
+      class: 'mp-save',
+      onclick: (e) => { e.stopPropagation(); toggleSave(id); },
+    }, icon('heart'), label ? h('span', { class: 'mp-save-label' }) : null);
+    const sync = (changed) => {
+      if (changed !== undefined && !btn.isConnected) { saved.listeners.delete(sync); return; }
+      if (changed !== undefined && changed !== id) return;
+      const on = saved.ids.has(id);
+      btn.classList.toggle('mp-on', on);
+      btn.setAttribute('aria-pressed', String(on));
+      btn.setAttribute('aria-label', on ? 'Remove from saved' : 'Save listing');
+      const l = btn.querySelector('.mp-save-label');
+      if (l) l.textContent = on ? 'Saved' : 'Save';
+    };
+    saved.listeners.add(sync);
+    sync();
+    return btn;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cards + detail dialog
+  // ---------------------------------------------------------------------------
+  function listingCard(item, imgUrl, onOpen) {
+    return h('article', { class: 'mp-card' },
+      h('button', { type: 'button', class: 'mp-card-hit', 'aria-label': `View ${item.title}`, onclick: () => onOpen(item) }),
+      h('div', { class: 'mp-card-media' },
+        imgUrl ? h('img', { src: imgUrl, alt: '', loading: 'lazy', decoding: 'async' }) : placeholder(item.category),
+        saveButton(item.id)),
+      h('div', { class: 'mp-card-body' },
+        h('div', { class: 'mp-card-meta' }, h('span', { class: 'mp-chip' }, item.category),
+          item.city ? h('span', { class: 'mp-muted' }, icon('pin'), item.city) : null),
+        h('h3', { class: 'mp-card-title' }, item.title),
+        h('div', { class: 'mp-card-foot' },
+          h('strong', { class: 'mp-price' }, money(item.price_cents)),
+          h('span', { class: 'mp-muted' }, item.seller_display_name))));
+  }
+
+  function previewCard(item, onGate) {
+    return h('article', { class: 'mp-card mp-card-locked' },
+      h('button', { type: 'button', class: 'mp-card-hit', 'aria-label': `${item.title} — members only`, onclick: onGate }),
+      h('div', { class: 'mp-card-media' }, placeholder(item.category, true)),
+      h('div', { class: 'mp-card-body' },
+        h('div', { class: 'mp-card-meta' }, h('span', { class: 'mp-chip' }, item.category),
+          item.city ? h('span', { class: 'mp-muted' }, icon('pin'), item.city) : null),
+        h('h3', { class: 'mp-card-title' }, item.title),
+        h('div', { class: 'mp-card-foot' },
+          h('span', { class: 'mp-blur', 'aria-hidden': 'true' }, '$•••'),
+          h('span', { class: 'mp-muted' }, 'Members only'))));
+  }
+
+  function openDialog(build) {
+    const dlg = h('dialog', { class: 'mp mp-dialog' });
+    const close = () => dlg.close();
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) close(); }); // backdrop click
+    dlg.addEventListener('close', () => dlg.remove());
+    dlg.append(h('button', { type: 'button', class: 'mp-dialog-x', 'aria-label': 'Close', onclick: close }, icon('close')));
+    dlg.append(build(close));
+    d.body.append(dlg);
+    dlg.showModal();
+    return dlg;
+  }
+
+  async function openListing(id, onClose) {
+    const body = h('div', { class: 'mp-detail' }, h('div', { class: 'mp-skeleton mp-skeleton-hero' }));
+    const dlg = openDialog(() => body);
+    if (onClose) dlg.addEventListener('close', onClose);
+    try {
+      const item = await api.getListing(id);
+      if (!item) { body.replaceChildren(h('p', { class: 'mp-empty' }, 'This listing is no longer available.')); return; }
+      const urls = item.image_path ? await api.signImages([item.image_path]) : {};
+      const img = urls[item.image_path];
+      body.replaceChildren(
+        h('div', { class: 'mp-detail-media' }, img ? h('img', { src: img, alt: item.title }) : placeholder(item.category)),
+        h('div', { class: 'mp-detail-body' },
+          h('div', { class: 'mp-card-meta' }, h('span', { class: 'mp-chip' }, item.category),
+            item.city ? h('span', { class: 'mp-muted' }, icon('pin'), item.city) : null),
+          h('h2', { class: 'mp-detail-title' }, item.title),
+          h('p', { class: 'mp-price mp-price-lg' }, money(item.price_cents)),
+          h('p', { class: 'mp-detail-desc' }, item.description),
+          h('p', { class: 'mp-muted' }, `Listed by ${item.seller_display_name || 'a member'} · `,
+            new Date(item.created_at).toLocaleDateString()),
+          h('div', { class: 'mp-actions' },
+            item.contact_email
+              ? h('a', { class: 'mp-btn', href: `mailto:${item.contact_email}?subject=${encodeURIComponent(`Re: ${item.title}`)}` }, 'Contact seller')
+              : null,
+            saveButton(item.id, true)),
+          item.contact_email ? h('p', { class: 'mp-muted mp-contact' }, item.contact_email) : null));
+    } catch (e) {
+      body.replaceChildren(h('p', { class: 'mp-error' }, friendlyError(e)));
+    }
+  }
+
+  function gatePrompt(kind) {
+    const next = currentUrl();
+    if (kind === 'pending') {
+      return h('div', { class: 'mp-gate' },
+        h('div', { class: 'mp-gate-icon' }, icon('lock')),
+        h('div', null,
+          h('strong', null, 'Your membership is pending approval'),
+          h('p', null, 'You’re signed in. Full listings, prices and seller contacts unlock as soon as your membership is activated.')));
+    }
+    return h('div', { class: 'mp-gate' },
+      h('div', { class: 'mp-gate-icon' }, icon('lock')),
+      h('div', null,
+        h('strong', null, 'This marketplace is for members'),
+        h('p', null, 'Join to see prices, photos and seller contact details, and to save listings.')),
+      h('div', { class: 'mp-actions' },
+        link('Join now', withNext(cfg.paths.signup, next), 'mp-btn'),
+        link('Log in', withNext(cfg.paths.login, next), 'mp-btn mp-btn-ghost')));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Components — <div data-mp="name" data-…></div>
+  // ---------------------------------------------------------------------------
+  const components = {};
+
+  components.marketplace = (el) => {
+    const limit = parseInt(el.dataset.limit, 10) || 0; // data-limit="4" = compact teaser (no filters)
+    const showFilters = !limit && el.dataset.filters !== 'false';
+    const q0 = router.query();
+    const f = {
+      q: q0.get('q') || '',
+      category: q0.get('category') || el.dataset.category || '',
+      maxPrice: q0.get('max') || '',
+      sort: q0.get('sort') || 'newest',
+      page: 0,
+    };
+    let lastMode = null;
+    let reqId = 0;
+
+    const gate = h('div', { class: 'mp-gate-slot' });
+    const grid = h('div', { class: 'mp-grid', 'aria-live': 'polite' });
+    const status = h('p', { class: 'mp-muted mp-count' });
+    const more = h('button', { type: 'button', class: 'mp-btn mp-btn-ghost mp-more', hidden: true,
+      onclick: () => { f.page += 1; load(true); } }, 'Load more');
+
+    const search = h('input', { type: 'search', class: 'mp-input', placeholder: 'Search listings…', value: f.q,
+      'aria-label': 'Search listings', oninput: debounce((e) => { f.q = e.target.value.trim(); refilter(); }, 300) });
+    const catSel = h('select', { class: 'mp-input', 'aria-label': 'Category', onchange: (e) => { f.category = e.target.value; refilter(); } },
+      h('option', { value: '' }, 'All categories'),
+      cfg.categories.map((c) => h('option', { value: c, selected: c === f.category }, c)));
+    const maxIn = h('input', { type: 'number', min: '0', step: '10', class: 'mp-input mp-input-sm', placeholder: 'Max $',
+      'aria-label': 'Maximum price', value: f.maxPrice,
+      oninput: debounce((e) => { f.maxPrice = e.target.value; refilter(); }, 400) });
+    const sortSel = h('select', { class: 'mp-input', 'aria-label': 'Sort', onchange: (e) => { f.sort = e.target.value; refilter(); } },
+      [['newest', 'Newest'], ['price_asc', 'Price: low to high'], ['price_desc', 'Price: high to low']]
+        .map(([v, t]) => h('option', { value: v, selected: v === f.sort }, t)));
+    const filters = h('div', { class: 'mp-filters' },
+      h('label', { class: 'mp-search' }, icon('search'), search), catSel, maxIn, sortSel);
+
+    el.replaceChildren(h('div', { class: 'mp mp-market' },
+      limit ? [grid, gate] : [gate, showFilters ? filters : null, status, grid, more]));
+
+    function mode() { return !state.user ? 'anon' : isActive() ? 'member' : 'pending'; }
+
+    function refilter() {
+      f.page = 0;
+      if (showFilters) router.setQuery({ q: f.q, category: f.category, max: f.maxPrice, sort: f.sort === 'newest' ? '' : f.sort });
+      load(false);
+    }
+
+    function skeletons(n) {
+      return Array.from({ length: n }, () => h('div', { class: 'mp-card mp-skeleton-card' },
+        h('div', { class: 'mp-skeleton mp-skeleton-media' }), h('div', { class: 'mp-skeleton mp-skeleton-line' }),
+        h('div', { class: 'mp-skeleton mp-skeleton-line mp-short' })));
+    }
+
+    function openFromCard(item) {
+      router.setQuery({ listing: item.id });
+      openListing(item.id, () => router.setQuery({ listing: '' }));
+    }
+
+    const showGateDialog = () => openDialog(() => gatePrompt(mode()));
+
+    async function load(append) {
+      const id = ++reqId;
+      const m = mode();
+      filters.hidden = m !== 'member';
+      if (!append) { grid.replaceChildren(...skeletons(limit || 6)); more.hidden = true; status.textContent = ''; }
+      gate.replaceChildren(m === 'member' ? '' : gatePrompt(m));
+      try {
+        if (m !== 'member') {
+          const rows = await api.listPreviews({ category: f.category, limit: limit || 12 });
+          if (id !== reqId) return;
+          grid.replaceChildren(...rows.map((r) => previewCard(r, showGateDialog)));
+          return;
+        }
+        const [{ rows, total }] = await Promise.all([
+          api.listListings({ ...f, maxPrice: parseFloat(f.maxPrice) || 0, page: f.page }),
+          loadSaved(),
+        ]);
+        const shown = limit ? rows.slice(0, limit) : rows;
+        const urls = await api.signImages(shown.map((r) => r.image_path).filter(Boolean));
+        if (id !== reqId) return;
+        const cards = shown.map((r) => listingCard(r, urls[r.image_path], openFromCard));
+        if (append) grid.append(...cards); else grid.replaceChildren(...cards);
+        if (!total) grid.replaceChildren(h('p', { class: 'mp-empty' }, 'No listings match those filters.'));
+        const count = grid.querySelectorAll('.mp-card').length;
+        if (!limit) status.textContent = total ? `${total} listing${total === 1 ? '' : 's'}` : '';
+        more.hidden = !!limit || count >= total;
+      } catch (e) {
+        if (id === reqId) grid.replaceChildren(h('p', { class: 'mp-error' }, friendlyError(e)));
+      }
+    }
+
+    const unsub = subscribe(() => {
+      if (!el.isConnected) { unsub(); return; }
+      const m = mode();
+      if (m !== lastMode) { lastMode = m; f.page = 0; load(false); }
+    });
+    ready.then(() => {
+      lastMode = mode();
+      load(false);
+      const deep = router.query().get('listing'); // shareable deep link
+      if (deep && lastMode === 'member' && !limit) openListing(deep, () => router.setQuery({ listing: '' }));
+    });
+  };
+
+  components.saved = (el) => {
+    const grid = h('div', { class: 'mp-grid' });
+    el.replaceChildren(h('div', { class: 'mp mp-market' }, grid));
+    async function load() {
+      if (!state.user) return;
+      if (!isActive()) { grid.replaceChildren(gatePrompt('pending')); return; }
+      grid.replaceChildren(h('div', { class: 'mp-skeleton mp-skeleton-line' }));
+      try {
+        const [rows] = await Promise.all([api.listSaved(), loadSaved()]);
+        const urls = await api.signImages(rows.map((r) => r.image_path).filter(Boolean));
+        if (!rows.length) {
+          grid.replaceChildren(h('div', { class: 'mp-empty' }, 'Nothing saved yet. ',
+            link('Browse the marketplace', cfg.paths.marketplace)));
+          return;
+        }
+        grid.replaceChildren(...rows.map((r) => listingCard(r, urls[r.image_path], (item) => openListing(item.id, load))));
+      } catch (e) { grid.replaceChildren(h('p', { class: 'mp-error' }, friendlyError(e))); }
+    }
+    let lastKey;
+    const key = () => `${state.user && state.user.id}:${isActive()}`;
+    const unsub = subscribe(() => {
+      if (!el.isConnected) { unsub(); return; }
+      if (key() !== lastKey) { lastKey = key(); load(); }
+    });
+    ready.then(() => { lastKey = key(); load(); });
+  };
+
+  function authForm({ title, intro, fields, submit, footer, onSubmit }) {
+    const err = h('p', { class: 'mp-error', role: 'alert', hidden: true });
+    const btn = h('button', { type: 'submit', class: 'mp-btn mp-btn-block' }, submit);
+    const form = h('form', { class: 'mp mp-auth', novalidate: true },
+      h('h2', { class: 'mp-auth-title' }, title),
+      intro ? h('p', { class: 'mp-muted' }, intro) : null,
+      fields.map((fd) => h('label', { class: 'mp-field' }, h('span', null, fd.label),
+        h('input', { class: 'mp-input', required: true, ...fd.attrs }))),
+      err, btn, footer ? h('div', { class: 'mp-auth-foot' }, footer) : null);
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      err.hidden = true;
+      if (!form.checkValidity()) { form.reportValidity(); return; }
+      btn.disabled = true;
+      const label = btn.textContent;
+      btn.textContent = 'Please wait…';
+      try { await onSubmit(Object.fromEntries(new FormData(form)), form); }
+      catch (ex) { err.textContent = friendlyError(ex); err.hidden = false; }
+      finally { btn.disabled = false; btn.textContent = label; }
+    });
+    return form;
+  }
+
+  components.login = (el) => {
+    const next = safeNext(router.query().get('next'));
+    ready.then(() => { if (state.user) router.go(next); }); // already signed in → no form, no loop
+    el.replaceChildren(authForm({
+      title: 'Member log in',
+      fields: [
+        { label: 'Email', attrs: { name: 'email', type: 'email', autocomplete: 'email' } },
+        { label: 'Password', attrs: { name: 'password', type: 'password', autocomplete: 'current-password' } },
+      ],
+      submit: 'Log in',
+      footer: [link('Forgot password?', cfg.paths.forgot), h('span', null, ' · New here? '),
+        link('Join', withNext(cfg.paths.signup, router.query().get('next')))],
+      async onSubmit({ email, password }) {
+        await api.auth.signIn(email.trim(), password);
+        await signedIn();
+        try { sessionStorage.removeItem(LOOP_KEY); } catch { /* storage blocked */ }
+        router.go(next);
+      },
+    }));
+  };
+
+  components.signup = (el) => {
+    ready.then(() => { if (state.user) router.go(safeNext(router.query().get('next'))); });
+    el.replaceChildren(authForm({
+      title: 'Become a member',
+      intro: 'Create your account. Membership is activated after review.',
+      fields: [
+        { label: 'Name', attrs: { name: 'name', type: 'text', autocomplete: 'name', maxlength: '80' } },
+        { label: 'Email', attrs: { name: 'email', type: 'email', autocomplete: 'email' } },
+        { label: 'Password', attrs: { name: 'password', type: 'password', autocomplete: 'new-password', minlength: '8' } },
+      ],
+      submit: 'Create account',
+      footer: [h('span', null, 'Already a member? '), link('Log in', withNext(cfg.paths.login, router.query().get('next')))],
+      async onSubmit({ name, email, password }, form) {
+        const res = await api.auth.signUp(email.trim(), password, name.trim());
+        if (res && res.session) { await signedIn(); router.go(safeNext(router.query().get('next'))); return; }
+        form.replaceChildren(h('h2', { class: 'mp-auth-title' }, 'Check your email'),
+          h('p', null, `We sent a confirmation link to ${email.trim()}. Open it to finish creating your account.`));
+      },
+    }));
+  };
+
+  components.forgot = (el) => {
+    el.replaceChildren(authForm({
+      title: 'Reset your password',
+      intro: 'Enter your email and we’ll send you a reset link.',
+      fields: [{ label: 'Email', attrs: { name: 'email', type: 'email', autocomplete: 'email' } }],
+      submit: 'Send reset link',
+      footer: [link('Back to log in', cfg.paths.login)],
+      async onSubmit({ email }, form) {
+        await api.auth.sendReset(email.trim());
+        // Same message whether or not the account exists — no account enumeration.
+        form.replaceChildren(h('h2', { class: 'mp-auth-title' }, 'Check your inbox'),
+          h('p', null, 'If an account exists for that email, a reset link is on its way.'),
+          link('Back to log in', cfg.paths.login));
+      },
+    }));
+  };
+
+  components.reset = (el) => {
+    const waiting = h('p', { class: 'mp-muted mp mp-auth' }, 'Verifying your reset link…');
+    el.replaceChildren(waiting);
+    const show = () => el.replaceChildren(authForm({
+      title: 'Choose a new password',
+      fields: [{ label: 'New password', attrs: { name: 'password', type: 'password', autocomplete: 'new-password', minlength: '8' } }],
+      submit: 'Update password',
+      async onSubmit({ password }) {
+        await api.auth.updatePassword(password);
+        toast('Password updated', 'ok');
+        router.go(cfg.paths.marketplace);
+      },
+    }));
+    // supabase-js exchanges the link's code and fires PASSWORD_RECOVERY.
+    const unsub = subscribe((s) => {
+      if (!el.isConnected) { unsub(); return; }
+      if (s.event === 'PASSWORD_RECOVERY') { unsub(); show(); }
+    });
+    ready.then((s) => {
+      if (s.event === 'PASSWORD_RECOVERY' || s.user) { unsub(); show(); return; }
+      setTimeout(() => {
+        if (!state.user && el.contains(waiting)) {
+          waiting.replaceChildren('This reset link is invalid or has expired. ', link('Request a new one', cfg.paths.forgot));
+        }
+      }, 3000);
+    });
+  };
+
+  components.account = (el) => {
+    const box = h('div', { class: 'mp mp-account' });
+    el.replaceChildren(box);
+    const render = () => {
+      if (!el.isConnected) { unsub(); return; }
+      if (!state.user) { box.replaceChildren(); return; }
+      const p = state.profile || {};
+      const st = p.membership_status || 'pending';
+      box.replaceChildren(
+        h('div', { class: 'mp-account-head' },
+          h('div', null, h('h2', { class: 'mp-auth-title' }, p.display_name || 'Your account'),
+            h('p', { class: 'mp-muted' }, state.user.email)),
+          h('span', { class: `mp-badge mp-badge-${st}` }, st)),
+        authForm({
+          title: 'Change password',
+          fields: [{ label: 'New password', attrs: { name: 'password', type: 'password', autocomplete: 'new-password', minlength: '8' } }],
+          submit: 'Update password',
+          async onSubmit({ password }, form) { await api.auth.updatePassword(password); form.reset(); toast('Password updated', 'ok'); },
+        }),
+        h('button', { type: 'button', class: 'mp-btn mp-btn-ghost', onclick: () => api.auth.signOut() }, 'Log out'));
+    };
+    const unsub = subscribe(render);
+    ready.then(render);
+  };
+
+  components.sell = (el) => {
+    const box = h('div', { class: 'mp' });
+    el.replaceChildren(box);
+    const render = () => {
+      if (!el.isConnected) { unsub(); return; }
+      if (!state.user) return;
+      if (!isActive()) { box.replaceChildren(gatePrompt('pending')); return; }
+      const preview = h('div', { class: 'mp-upload-preview' }, placeholder('+'));
+      const form = authForm({
+        title: 'Post a listing',
+        fields: [
+          { label: 'Title', attrs: { name: 'title', type: 'text', minlength: '3', maxlength: '120' } },
+          { label: 'City', attrs: { name: 'city', type: 'text', maxlength: '60' } },
+          { label: 'Price (USD)', attrs: { name: 'price', type: 'number', min: '0', step: '1' } },
+          { label: 'Contact email', attrs: { name: 'contact_email', type: 'email', value: state.user.email } },
+        ],
+        submit: 'Publish listing',
+        async onSubmit(data, f) {
+          const file = f.querySelector('[name="image"]').files[0];
+          if (file && (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size > 5 * 1024 * 1024)) {
+            throw new Error('Images must be JPG, PNG or WebP and under 5 MB.');
+          }
+          await api.createListing(state.user.id, {
+            title: data.title.trim(),
+            description: data.description.trim(),
+            category: data.category,
+            city: data.city.trim(),
+            price_cents: Math.round(parseFloat(data.price) * 100),
+            contact_email: data.contact_email.trim(),
+          }, file);
+          toast('Listing published', 'ok');
+          router.go(cfg.paths.marketplace);
+        },
+      });
+      // Extra fields that aren't plain inputs.
+      const anchor = form.querySelector('.mp-error');
+      anchor.before(
+        h('label', { class: 'mp-field' }, h('span', null, 'Category'),
+          h('select', { class: 'mp-input', name: 'category', required: true }, cfg.categories.map((c) => h('option', { value: c }, c)))),
+        h('label', { class: 'mp-field' }, h('span', null, 'Description'),
+          h('textarea', { class: 'mp-input', name: 'description', rows: '4', maxlength: '4000' })),
+        h('label', { class: 'mp-field' }, h('span', null, 'Photo (optional)'),
+          h('div', { class: 'mp-upload' }, preview,
+            h('input', { type: 'file', name: 'image', accept: 'image/jpeg,image/png,image/webp', onchange: (e) => {
+              const file = e.target.files[0];
+              preview.replaceChildren(file ? h('img', { src: URL.createObjectURL(file), alt: '' }) : placeholder('+'));
+            } }))));
+      form.classList.add('mp-sell');
+      box.replaceChildren(form);
+    };
+    let lastKey;
+    const unsub = subscribe(() => {
+      const key = `${state.user && state.user.id}:${isActive()}`;
+      if (key !== lastKey) { lastKey = key; render(); }
+    });
+    ready.then(() => { lastKey = `${state.user && state.user.id}:${isActive()}`; render(); });
+  };
+
+  // Auth-aware nav. Also usable as pure CSS: html.mp-auth-in / .mp-auth-out / .mp-member-active
+  components['auth-nav'] = (el) => {
+    const render = () => {
+      if (!el.isConnected) { unsub(); return; }
+      el.replaceChildren(h('nav', { class: 'mp mp-nav' }, state.user
+        ? [link('Saved', cfg.paths.saved), link('Account', cfg.paths.account),
+          h('button', { type: 'button', class: 'mp-link', onclick: () => api.auth.signOut() }, 'Log out')]
+        : [link('Log in', withNext(cfg.paths.login, currentUrl())), link('Join', cfg.paths.signup, 'mp-btn mp-btn-sm')]));
+    };
+    const unsub = subscribe(render);
+    ready.then(render);
+  };
+
+  components.guard = () => {}; // marker only; see guard()
+
+  // ---------------------------------------------------------------------------
+  // Mount
+  // ---------------------------------------------------------------------------
+  function mount(root) {
+    (root || d).querySelectorAll('[data-mp]').forEach((el) => {
+      if (el.__mpMounted) return;
+      const c = components[el.dataset.mp];
+      if (!c) { console.warn('[MP] unknown component', el.dataset.mp); return; }
+      el.__mpMounted = true;
+      try { c(el); } catch (e) { console.error('[MP]', el.dataset.mp, e); }
+    });
+    guard();
+  }
+
+  w.MP = {
+    version: '1.0.0',
+    config: cfg,
+    api,
+    state,
+    ready,
+    subscribe,
+    mount,
+    refreshProfile,
+    toast,
+    components, // extension point: MP.components.myThing = (el) => {}
+  };
+
+  if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', () => mount());
+  else mount();
+  // Squarespace 7.0 templates with AJAX page loading fire this on navigation.
+  w.addEventListener('mercury:load', () => mount());
+})(window, document);
+
+</script>
+
+</html>

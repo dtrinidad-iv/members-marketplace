@@ -1,4 +1,4 @@
-// End-to-end test of the clickable demo (dist/marketplace-demo.html, mock backend)
+// End-to-end test of the clickable demo (docs/index.html, or DEMO_URL; mock backend)
 // in headless Chrome. Run: npm run test:e2e   (CHROME_PATH overrides the browser)
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import puppeteer from 'puppeteer-core';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const DEMO = pathToFileURL(resolve(ROOT, 'dist/marketplace-demo.html')).href;
+const DEMO = process.env.DEMO_URL || pathToFileURL(resolve(ROOT, 'docs/index.html')).href;
 const CHROME = process.env.CHROME_PATH || [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   '/usr/bin/google-chrome',

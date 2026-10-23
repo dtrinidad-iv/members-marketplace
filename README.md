@@ -13,7 +13,7 @@ Squarespace page ──► Code Block <div data-mp="marketplace">
 
 ## Try the demo
 
-**Live demo:** https://claude.ai/artifact/Rmi6GHUwxHg2Am7UeR8Q9m. It runs in the browser with nothing to install. A built-in mock backend applies the same access rules as the real database.
+**Live demo:** https://dtrinidad-iv.github.io/members-marketplace/. It runs in the browser with nothing to install. A built-in mock backend applies the same access rules as the real database.
 
 The page shows a sample Squarespace site, with a **developer panel** beside it showing who is signed in and what the database returns for them.
 
@@ -33,7 +33,7 @@ Things to try:
 6. **Forgot password:** request a reset, open the link from the simulated inbox, and set a new password.
 7. Click **Show code blocks** to see exactly which Squarespace Code Block powers each part of the page.
 
-To run the demo locally instead, use `npm run build:demo` and open `dist/marketplace-demo.html`.
+To run the demo locally instead, use `npm run build:demo` and open `docs/index.html`.
 
 ## What's here
 
@@ -49,7 +49,7 @@ To run the demo locally instead, use `npm run build:demo` and open `dist/marketp
 | `src/mp-mock.js` | Demo-only in-browser backend with the same rules (no setup needed) |
 | `squarespace/header-injection.html` | What goes in Settings → Code Injection → Header |
 | `squarespace/code-blocks.md` | Which Code Block goes on which page, plus Supabase settings |
-| `dist/marketplace-demo.html` | Clickable demo (open it in a browser, no server needed) |
+| `docs/index.html` | Clickable demo, served by GitHub Pages (rebuilt from `src/` by `npm run build:demo`) |
 
 ## Features → requirements
 
