@@ -10,7 +10,8 @@
     "test:hooks": "node --test tests/hooks.test.mjs",
     "test:e2e": "node scripts/build-demo.mjs && node --test tests/demo.e2e.test.mjs",
     "test:rls": "supabase db reset && node tests/rls.test.mjs",
-    "build:demo": "node scripts/build-demo.mjs"
+    "build:demo": "node scripts/build-demo.mjs",
+    "screenshots": "node scripts/screenshots.mjs"
   },
   "devDependencies": {
     "@supabase/supabase-js": "2.45.4",

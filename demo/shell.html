@@ -109,7 +109,8 @@ main#site-main { padding: 40px 32px 56px; min-height: 520px; }
   content: "Code Block · data-mp=\"" attr(data-mp) "\""; position: absolute; top: -18px; left: 0; z-index: 3;
   font: 500 10.5px/1 var(--f-mono); background: var(--accent); color: var(--accent-ink); padding: 3px 6px; border-radius: 4px; transform: translateY(-50%);
 }
-.show-blocks .site-header [data-mp]::before { top: -6px; }
+.show-blocks [data-mp]::before { white-space: nowrap; }
+.show-blocks .site-header [data-mp]::before { top: auto; bottom: -26px; left: auto; right: 0; transform: none; }
 
 /* Developer panel */
 .panel { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); background: var(--panel); color: var(--panel-ink); border-radius: 12px; overflow: hidden; font-size: 13px; max-height: calc(100dvh - 32px); display: flex; flex-direction: column; }

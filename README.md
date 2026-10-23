@@ -35,6 +35,74 @@ Things to try:
 
 To run the demo locally instead, use `npm run build:demo` and open `docs/index.html`.
 
+## Screenshots
+
+Every flow, captured from the live demo (`npm run screenshots` regenerates them).
+
+**Visitors** see teaser cards only: no photos, prices or contacts. The database returns 0 listings to them.
+
+![01-visitor-marketplace-locked](screenshots/01-visitor-marketplace-locked.png)
+
+Clicking a locked listing shows the **join prompt**.
+
+![02-visitor-join-prompt](screenshots/02-visitor-join-prompt.png)
+
+**Protected pages** redirect to login and remember where you were going (`?next=/saved`).
+
+![03-protected-page-redirects-to-login](screenshots/03-protected-page-redirects-to-login.png)
+
+**Sign up.** New accounts start as *pending*.
+
+![04-signup](screenshots/04-signup.png)
+
+**Pending members** are signed in, but listings stay locked until approved.
+
+![05-pending-member-awaiting-approval](screenshots/05-pending-member-awaiting-approval.png)
+
+**Active members** get the full marketplace: photos, prices, sellers and save buttons.
+
+![06-member-marketplace](screenshots/06-member-marketplace.png)
+
+**Filters** (search, category, max price, sort) are reflected in the URL, so filtered views can be shared.
+
+![07-member-filtered-search](screenshots/07-member-filtered-search.png)
+
+**Listing detail** with seller contact, plus **save/bookmark**.
+
+![08-listing-detail-saved](screenshots/08-listing-detail-saved.png)
+
+**Saved listings** page.
+
+![09-saved-listings](screenshots/09-saved-listings.png)
+
+**Post a listing** with a photo. Photos go to a private storage bucket.
+
+![10-post-listing-with-photo](screenshots/10-post-listing-with-photo.png)
+
+The new listing appears **at the top of the marketplace**.
+
+![11-new-listing-live](screenshots/11-new-listing-live.png)
+
+**Account:** membership status, change password, log out.
+
+![12-account](screenshots/12-account.png)
+
+**Forgot password.** The same message shows whether or not the account exists, so emails can't be probed.
+
+![13-forgot-password-email-sent](screenshots/13-forgot-password-email-sent.png)
+
+**Reset password** from the emailed link.
+
+![14-reset-password](screenshots/14-reset-password.png)
+
+**How it maps to Squarespace:** each dashed box is one Code Block pasted into the page.
+
+![15-squarespace-code-blocks](screenshots/15-squarespace-code-blocks.png)
+
+**Mobile.**
+
+![16-mobile](screenshots/16-mobile.png)
+
 ## What's here
 
 | Path | What it is |
