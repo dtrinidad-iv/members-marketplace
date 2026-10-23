@@ -11,6 +11,30 @@ Squarespace page ──► Code Block <div data-mp="marketplace">
                                                                     └─ Storage (private bucket)
 ```
 
+## Try the demo
+
+**Live demo:** https://claude.ai/artifact/Rmi6GHUwxHg2Am7UeR8Q9m. It runs in the browser with nothing to install. A built-in mock backend applies the same access rules as the real database.
+
+The page shows a sample Squarespace site, with a **developer panel** beside it showing who is signed in and what the database returns for them.
+
+| Account | Password | What you'll see |
+|---|---|---|
+| (signed out) | | Teaser cards only: locked photos, hidden prices, and a join prompt |
+| `pending@demo.com` | `demo1234` | Signed in, but listings stay locked until membership is approved |
+| `member@demo.com` | `demo1234` | Full marketplace: photos, prices, seller contact, save, and post a listing |
+
+Things to try:
+
+1. **As a visitor**, open a listing. You get a join prompt, and the panel shows `select listings` returning **0** rows.
+2. **Go to Saved while signed out.** You're sent to `/login?next=/saved`. Log in as `member@demo.com` and you land back on Saved.
+3. **In the marketplace**, search, filter by category or set a max price. The address bar updates, so filtered views can be shared. Open a listing and save it.
+4. **Switch to the pending member** with the panel's quick buttons. Everything locks. Click **Approve** in the panel and it unlocks without a reload.
+5. **Sell:** post a listing with a photo. It appears first in the marketplace.
+6. **Forgot password:** request a reset, open the link from the simulated inbox, and set a new password.
+7. Click **Show code blocks** to see exactly which Squarespace Code Block powers each part of the page.
+
+To run the demo locally instead, use `npm run build:demo` and open `dist/marketplace-demo.html`.
+
 ## What's here
 
 | Path | What it is |
@@ -51,15 +75,6 @@ Squarespace page ──► Code Block <div data-mp="marketplace">
 - `SECURITY DEFINER` functions pin `search_path = ''`.
 - All user content is rendered with `textContent` (no `innerHTML`), so listing text can't inject scripts.
 - `onAuthStateChange` work is deferred with `setTimeout` to avoid the supabase-js lock deadlock.
-
-## Run the demo
-
-```bash
-node scripts/build-demo.mjs        # rebuilds dist/marketplace-demo.html from src/
-open dist/marketplace-demo.html
-```
-
-Demo accounts (password `demo1234`): `member@demo.com` (active), `pending@demo.com` (pending).
 
 ## Local Supabase + tests
 
